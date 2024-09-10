@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 
 export function Navbar() {
     return (
-    <NavbarBs className="bg-white shadow-sm mb-3">
+    <NavbarBs sticky="top" className="bg-white shadow-sm mb-3">
         <Container>
             <Nav className="me-auto">
                 <Nav.Link to="/" as={NavLink}>
@@ -22,14 +22,14 @@ export function Navbar() {
                 className="rounded-circle"
             >
                 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" 
-                    viewBox="0 0 502 502" xmlSpace="preserve">
+                    viewBox="0 0 502 502" xmlSpace="preserve" fill="currentColor">
                 <g>
-                    <rect x="10" y="319" style={{fill:"#F0EFE4;", width:"482", height:"36"}}/>
+                    <rect x="10" y="319" style={{fill:"#F0EFE4", width:"482", height:"36"}}/>
                     <g>
-                        <rect x="189" y="112" style={{fill:"#F0EFE4;", width:"62", height:"207"}}/>
-                        <polygon style={{fill:"#F77E65;"}} points="127,73 127,112 65,112 65,319 127,319 189,319 189,73 		"/>
-                        <rect x="375" y="128" style={{fill:"#F0EFE4;", width:"62", height:"191"}}/>
-                        <polygon style={{fill:"#F77E65;"}} points="313,86 313,166 251,166 251,319 313,319 375,319 375,86 		"/>
+                        <rect x="189" y="112" style={{fill:"#F0EFE4", width:"62", height:"207"}}/>
+                        <polygon style={{fill:"#F77E65"}} points="127,73 127,112 65,112 65,319 127,319 189,319 189,73 		"/>
+                        <rect x="375" y="128" style={{fill:"#F0EFE4", width:"62", height:"191"}}/>
+                        <polygon style={{fill:"#F77E65"}} points="313,86 313,166 251,166 251,319 313,319 375,319 375,86 		"/>
                         <g>
                             <path d="M492,309h-45V128c0-5.523-4.477-10-10-10h-52V86c0-5.523-4.477-10-10-10h-62c-5.523,0-10,4.477-10,10v70h-42v-44
                                 c0-5.523-4.477-10-10-10h-52V73c0-5.523-4.477-10-10-10h-62c-5.523,0-10,4.477-10,10v29H65c-5.523,0-10,4.477-10,10v197H10
@@ -46,6 +46,17 @@ export function Navbar() {
                     </g>
                 </g>
                 </svg>
+                <div className="rounded-circle bg-danger d-flex justify-content-center 
+                align-items-center"
+                style={{ 
+                    color:"white",
+                    width:"1.5rem",
+                    height:"1.5rem",
+                    position:"absolute",
+                    bottom:0,
+                    right:0,
+                    transform:"translate(25%, 25%)",
+                }}>3</div>
             </Button>
         </Container>
     </NavbarBs>
