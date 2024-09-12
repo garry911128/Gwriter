@@ -1,21 +1,29 @@
 import { Button, Card } from "react-bootstrap";
 import { formatCurrency } from "../utilities/formatCurrency";
+import { useShoppingCart } from "../context/ShoppingCartContext";
 
 type StoreItemProps = {
+    id: number;
     title: string;
-    image: string;
+    img_url: string;
     price: number;
     rating: number;
     description: string;
 };
 
-export function StoreItem({ title, image, price, rating, description } : StoreItemProps) {
+export function StoreItem({ id, title, img_url, price, rating, description } : StoreItemProps) {
+    const { 
+        getItemQuantity,
+        increaseCartQuantity,
+        decreaseCartQuantity,
+        removeFromCart
+    } = useShoppingCart();
     const quantity = 0;
     return ( 
     <Card className="h-100">
         <Card.Img 
             variant="top"
-            src={image}
+            src={img_url}
             height="200px"
             style={{objectFit:"cover"}}
         />
@@ -26,21 +34,24 @@ export function StoreItem({ title, image, price, rating, description } : StoreIt
                 <span className="ms-2 text-muted">{formatCurrency(price)}</span>
             </Card.Title>
             <div className="me-auto">
-                (quantity === 0 ? (
-                    <Button className="w-100">+ Add To Cart</Button>
-                ) : 
-                <div className="d-flex align-items-center justify-content-center" style={{gap:".5rem"}}>
-                    <div className="d-flex align-items-center 
-                    justify-content-center" style={{gap:".5rem"}}>
-                        <Button>-</Button>
-                        <span className="fs-3">
-                            {quantity}
-                        </span>
-                        in cart
-                        <Button>+</Button>
-                    </div>    
-                    <Button variant="danger" size="sm">Remove</Button>
-                </div>)
+                {quantity === 0 ? (
+                    <Button className="w-100" onClick={ () => increaseCartQuantity(id)}>+ Add To Cart</Button>
+                ) : (
+                    <div className="d-flex align-items-center justify-content-center" style={{gap:".5rem"}}>
+                        <div className="d-flex align-items-center 
+                        justify-content-center" style={{gap:".5rem"}}>
+                            <Button onClick={ () => decreaseCartQuantity(id)}>-</Button>
+                            <span className="fs-3">
+                                {quantity}
+                            </span>
+                            in cart
+                            <Button onClick={ () => increaseCartQuantity(id)}>+</Button>
+                        </div>    
+                        <Button variant="danger" size="sm" onClick={ () => removeFromCart(id)}>
+                            Remove
+                        </Button>
+                    </div>
+                )}
             </div>
             <Card.Text>{description}</Card.Text>
             <Card.Text>Price: ${price}</Card.Text>

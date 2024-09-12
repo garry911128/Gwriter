@@ -1,5 +1,6 @@
 import { Row, Col } from 'react-bootstrap'
 import storeItems from '../assets/data/books.json'
+import { StoreItem } from '../components/StoreItem'
 
 export function Store() {
   return (
