@@ -18,7 +18,8 @@ export function StoreItem({ id, title, img_url, price, rating, description } : S
         decreaseCartQuantity,
         removeFromCart
     } = useShoppingCart();
-    const quantity = 0;
+    const quantity = getItemQuantity(id);
+
     return ( 
     <Card className="h-100">
         <Card.Img 
