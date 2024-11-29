@@ -1,18 +1,7 @@
 # Gwriter
-  npm start
-    Starts the development server.
+cd frontend
+npm install
+npm install react-router-dom
 
-  npm run build
-    Bundles the app into static files for production.
-
-  npm test
-    Starts the test runner.
-
-  npm run eject
-    Removes this tool and copies build dependencies, configuration files
-    and scripts into the app directory. If you do this, you can’t go back!
-
-We suggest that you begin by typing:
-
-  cd gwriter
-  npm start
+#show frontend
+npm run dev
