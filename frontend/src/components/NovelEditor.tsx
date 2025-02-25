@@ -5,16 +5,17 @@ const NovelEditor: React.FC = () => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [wordCount, setWordCount] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<string>("Option 1");
+  const [textStyle, setTextStyle] = useState<string>("Normal");
+  const [formatting, setFormatting] = useState<string>("None");
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
     setWordCount(e.target.value.trim().split(/\s+/).length);
   };
 
-  const handleDropdownSelect = (eventKey: string) => {
-    setSelectedOption(eventKey);
-  };
+  // const handleDropdownSelect = (eventKey: string) => {
+  //   setSelectedOption(eventKey);
+  // };
 
   return (
     <Container className="p-4 bg-dark text-light rounded">
@@ -36,15 +37,28 @@ const NovelEditor: React.FC = () => {
         {/* 左側 Dropdown */}
         <Col md={3}>
           <Container className="p-3 bg-secondary rounded">
+            {/* Text Style 選單 */}
             <DropdownButton
-              id="dropdown-basic-button"
-              title={selectedOption}
-              onSelect={handleDropdownSelect}
+              id="text-style-dropdown"
+              title={`Text Style: ${textStyle}`}
+              onSelect={(eventKey) => setTextStyle(eventKey || "Normal")}
+              className="w-100 mb-2"
+            >
+              <Dropdown.Item eventKey="Normal">Normal</Dropdown.Item>
+              <Dropdown.Item eventKey="Bold">Bold</Dropdown.Item>
+              <Dropdown.Item eventKey="Italic">Italic</Dropdown.Item>
+            </DropdownButton>
+
+            {/* Formatting 選單 */}
+            <DropdownButton
+              id="formatting-dropdown"
+              title={`Formatting: ${formatting}`}
+              onSelect={(eventKey) => setFormatting(eventKey || "None")}
               className="w-100"
             >
-              <Dropdown.Item eventKey="Option 1">Option 1</Dropdown.Item>
-              <Dropdown.Item eventKey="Option 2">Option 2</Dropdown.Item>
-              <Dropdown.Item eventKey="Option 3">Option 3</Dropdown.Item>
+              <Dropdown.Item eventKey="None">None</Dropdown.Item>
+              <Dropdown.Item eventKey="Indent">Indent</Dropdown.Item>
+              <Dropdown.Item eventKey="Justify">Justify</Dropdown.Item>
             </DropdownButton>
           </Container>
         </Col>
