@@ -2,6 +2,13 @@ import React, { useState, useCallback, useMemo } from "react";
 import { Form, Button, Container, Row, Col } from "react-bootstrap";
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import ChaptersList from './chapters/ChaptersList';
+import CharactersList from './characters/CharactersList';
+import WorldList from './world/WorldList';
+import DraftsList from './drafts/DraftsList';
+import AIAssistant from './ai/AIAssistant';
+import StatsPanel from './stats/StatsPanel';
+import SettingsPanel from './settings/SettingsPanel';
 
 // 自訂 Quill 暗色主題樣式和全局UI樣式
 const quillStyles = `
@@ -408,185 +415,26 @@ const NovelEditor: React.FC = () => {
         }}>
           <div className="p-3">
             {activeTab === 'writing' && (
-              <div>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6 className={`mb-0 fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                    <i className="bi bi-book me-2" style={{ color: '#4a90e2' }}></i>
-                    章節清單
-                  </h6>
-                  <Button
-                    variant="success"
-                    size="sm"
-                    onClick={handleAddChapter}
-                    style={{ borderRadius: '10px' }}
-                  >
-                    <i className="bi bi-plus"></i>
-                  </Button>
-                </div>
-                
-                {/* 章節列表 */}
-                <div className="chapter-list">
-                  {chapters.sort((a, b) => a.order - b.order).map((chapter) => (
-                    <div
-                      key={chapter.id}
-                      className={`chapter-item p-3 mb-2 rounded-3 ${
-                        currentChapterId === chapter.id ? 'active' : ''
-                      }`}
-                      onClick={() => handleChapterSelect(chapter.id)}
-                      style={{ 
-                        cursor: 'pointer',
-                        background: currentChapterId === chapter.id 
-                          ? 'linear-gradient(45deg, #4a90e2, #357abd)' 
-                          : isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                        border: currentChapterId === chapter.id 
-                          ? '2px solid rgba(255, 255, 255, 0.3)' 
-                          : `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
-                      <div className="d-flex justify-content-between align-items-start">
-                        <div className="flex-grow-1">
-                          <div className={`fw-bold mb-1 ${currentChapterId === chapter.id ? 'text-white' : isDarkMode ? 'text-white' : 'text-dark'}`} style={{ fontSize: '0.9rem' }}>
-                            第{chapter.order}章: {chapter.title}
-                          </div>
-                          <div className={`small ${currentChapterId === chapter.id ? 'text-white opacity-75' : isDarkMode ? 'text-light opacity-75' : 'text-muted'}`}>
-                            <i className="bi bi-file-text me-1"></i>
-                            {chapter.wordCount} 字
-                          </div>
-                        </div>
-                        {chapters.length > 1 && (
-                          <Button
-                            variant="link"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteChapter(chapter.id);
-                            }}
-                            className="text-danger p-1"
-                            style={{ fontSize: '0.8rem' }}
-                          >
-                            <i className="bi bi-trash3"></i>
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 新增草稿按鈕 */}
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  className="w-100 mt-3"
-                  style={{ borderRadius: '10px' }}
-                >
-                  <i className="bi bi-file-plus me-2"></i>
-                  新增草稿
-                </Button>
-              </div>
+              <ChaptersList
+                chapters={chapters}
+                currentChapterId={currentChapterId}
+                isDarkMode={isDarkMode}
+                handleChapterSelect={handleChapterSelect}
+                handleDeleteChapter={handleDeleteChapter}
+                handleAddChapter={handleAddChapter}
+              />
             )}
 
             {activeTab === 'characters' && (
-              <div>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6 className={`mb-0 fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                    <i className="bi bi-people me-2" style={{ color: '#e74c3c' }}></i>
-                    角色卡
-                  </h6>
-                  <Button variant="success" size="sm" style={{ borderRadius: '10px' }}>
-                    <i className="bi bi-plus"></i>
-                  </Button>
-                </div>
-                
-                {characters.map((character) => (
-                  <div
-                    key={character.id}
-                    className="character-item p-3 mb-2 rounded-3"
-                    style={{ 
-                      background: isDarkMode ? 'rgba(231, 76, 60, 0.2)' : 'rgba(231, 76, 60, 0.1)',
-                      border: `1px solid ${isDarkMode ? 'rgba(231, 76, 60, 0.3)' : 'rgba(231, 76, 60, 0.2)'}`,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div className={`fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                      {character.name}
-                    </div>
-                    <div className={`small ${isDarkMode ? 'text-light opacity-75' : 'text-muted'}`}>
-                      {character.role}
-                    </div>
-                    <div className={`small mt-1 ${isDarkMode ? 'text-light opacity-75' : 'text-muted'}`}>
-                      {character.description}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <CharactersList characters={characters} isDarkMode={isDarkMode} />
             )}
 
             {activeTab === 'world' && (
-              <div>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6 className={`mb-0 fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                    <i className="bi bi-globe me-2" style={{ color: '#00b894' }}></i>
-                    世界觀資料
-                  </h6>
-                  <Button variant="success" size="sm" style={{ borderRadius: '10px' }}>
-                    <i className="bi bi-plus"></i>
-                  </Button>
-                </div>
-                
-                {worldData.map((world) => (
-                  <div
-                    key={world.id}
-                    className="world-item p-3 mb-2 rounded-3"
-                    style={{ 
-                      background: isDarkMode ? 'rgba(0, 184, 148, 0.2)' : 'rgba(0, 184, 148, 0.1)',
-                      border: `1px solid ${isDarkMode ? 'rgba(0, 184, 148, 0.3)' : 'rgba(0, 184, 148, 0.2)'}`,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div className={`fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                      {world.name}
-                    </div>
-                    <div className={`small ${isDarkMode ? 'text-light opacity-75' : 'text-muted'}`}>
-                      <i className={`bi ${world.type === 'location' ? 'bi-geo-alt' : world.type === 'history' ? 'bi-clock-history' : 'bi-people'} me-1`}></i>
-                      {world.type === 'location' ? '地點' : world.type === 'history' ? '歷史' : '文化'}
-                    </div>
-                    <div className={`small mt-1 ${isDarkMode ? 'text-light opacity-75' : 'text-muted'}`}>
-                      {world.description}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <WorldList worldData={worldData} isDarkMode={isDarkMode} />
             )}
 
             {activeTab === 'drafts' && (
-              <div>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6 className={`mb-0 fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                    <i className="bi bi-file-earmark-text me-2" style={{ color: '#fd79a8' }}></i>
-                    草稿版本
-                  </h6>
-                </div>
-                
-                {drafts.map((draft) => (
-                  <div
-                    key={draft.id}
-                    className="draft-item p-3 mb-2 rounded-3"
-                    style={{ 
-                      background: isDarkMode ? 'rgba(253, 121, 168, 0.2)' : 'rgba(253, 121, 168, 0.1)',
-                      border: `1px solid ${isDarkMode ? 'rgba(253, 121, 168, 0.3)' : 'rgba(253, 121, 168, 0.2)'}`,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div className={`fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                      {draft.name}
-                    </div>
-                    <div className={`small ${isDarkMode ? 'text-light opacity-75' : 'text-muted'}`}>
-                      {draft.timestamp.toLocaleString('zh-TW')}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <DraftsList drafts={drafts} isDarkMode={isDarkMode} />
             )}
           </div>
         </Col>
@@ -675,36 +523,7 @@ const NovelEditor: React.FC = () => {
             </div>
 
             {/* AI寫作助手浮動區域 */}
-            <div className="ai-assistant-card p-3 rounded-3 mb-4" style={{
-              background: isDarkMode 
-                ? 'linear-gradient(45deg, #667eea, #764ba2)' 
-                : 'linear-gradient(45deg, #a8edea, #fed6e3)',
-              color: isDarkMode ? 'white' : '#333'
-            }}>
-              <div className="d-flex align-items-center mb-2">
-                <i className="bi bi-robot me-2"></i>
-                <strong>AI 寫作助手</strong>
-              </div>
-              <p className="small mb-2">
-                "考慮在這裡加入一些對話來推進情節發展，或者描述角色的內心想法來增加深度。"
-              </p>
-              <div className="d-flex gap-2">
-                <Button 
-                  variant={isDarkMode ? "outline-light" : "outline-primary"} 
-                  size="sm"
-                  style={{ borderRadius: '8px' }}
-                >
-                  採用建議
-                </Button>
-                <Button 
-                  variant={isDarkMode ? "outline-light" : "outline-secondary"} 
-                  size="sm"
-                  style={{ borderRadius: '8px' }}
-                >
-                  更多建議
-                </Button>
-              </div>
-            </div>
+            <AIAssistant isDarkMode={isDarkMode} />
           </div>
         </Col>
 
@@ -714,156 +533,17 @@ const NovelEditor: React.FC = () => {
           overflow: 'auto'
         }}>
           <div className="p-4">
-            {/* 每日目標進度條 */}
-            <div className="mb-4">
-              <h6 className={`mb-3 fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                <i className="bi bi-calendar-check me-2" style={{ color: '#4a90e2' }}></i>
-                每日目標
-              </h6>
-              <div className="goal-section p-3 rounded-3" style={{
-                background: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(74, 144, 226, 0.1)',
-                backdropFilter: 'blur(10px)'
-              }}>
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className={`small ${isDarkMode ? 'text-light' : 'text-dark'}`}>目標字數</span>
-                  <input 
-                    type="number" 
-                    className="form-control form-control-sm" 
-                    value={dailyGoal}
-                    onChange={(e) => setDailyGoal(Number(e.target.value))}
-                    style={{
-                      width: '80px',
-                      background: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.8)',
-                      border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}`,
-                      color: isDarkMode ? 'white' : '#333',
-                      borderRadius: '8px'
-                    }}
-                  />
-                </div>
-                <div className="progress mb-2" style={{ height: '10px' }}>
-                  <div 
-                    className="progress-bar" 
-                    style={{
-                      width: `${Math.min((wordCount / dailyGoal) * 100, 100)}%`,
-                      background: 'linear-gradient(45deg, #00b894, #00a085)'
-                    }}
-                  ></div>
-                </div>
-                <small className={isDarkMode ? 'text-light' : 'text-dark'}>
-                  今日進度: {wordCount}/{dailyGoal} 字 ({Math.round((wordCount / dailyGoal) * 100)}%)
-                </small>
-              </div>
-            </div>
-
-            {/* 總字數、章節數、預估閱讀時間 */}
-            <div className="mb-4">
-              <h6 className={`mb-3 fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                <i className="bi bi-graph-up me-2" style={{ color: '#4a90e2' }}></i>
-                統計數據
-              </h6>
-              <div className="d-flex flex-column gap-3">
-                <div className="stat-card p-3 rounded-3" style={{
-                  background: 'linear-gradient(45deg, #4a90e2, #357abd)',
-                  border: 'none'
-                }}>
-                  <div className="d-flex justify-content-between align-items-center text-white">
-                    <span className="fw-bold">
-                      <i className="bi bi-file-word me-2"></i>總字數
-                    </span>
-                    <span className="fs-5 fw-bold">{chapters.reduce((sum, ch) => sum + ch.wordCount, 0)}</span>
-                  </div>
-                </div>
-                <div className="stat-card p-3 rounded-3" style={{
-                  background: 'linear-gradient(45deg, #00b894, #00a085)',
-                  border: 'none'
-                }}>
-                  <div className="d-flex justify-content-between align-items-center text-white">
-                    <span className="fw-bold">
-                      <i className="bi bi-collection me-2"></i>章節數
-                    </span>
-                    <span className="fs-5 fw-bold">{chapters.length}</span>
-                  </div>
-                </div>
-                <div className="stat-card p-3 rounded-3" style={{
-                  background: 'linear-gradient(45deg, #fd79a8, #e84393)',
-                  border: 'none'
-                }}>
-                  <div className="d-flex justify-content-between align-items-center text-white">
-                    <span className="fw-bold">
-                      <i className="bi bi-stopwatch me-2"></i>預估閱讀
-                    </span>
-                    <span className="fs-6 fw-bold">{Math.ceil(chapters.reduce((sum, ch) => sum + ch.wordCount, 0) / 250)}分鐘</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* AI靈感建議 */}
-            <div className="mb-4">
-              <h6 className={`mb-3 fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                <i className="bi bi-lightbulb me-2" style={{ color: '#f39c12' }}></i>
-                AI靈感建議
-              </h6>
-              <div className="inspiration-card p-3 rounded-3" style={{
-                background: isDarkMode 
-                  ? 'linear-gradient(45deg, #f39c12, #e67e22)' 
-                  : 'linear-gradient(45deg, #ffeaa7, #fdcb6e)',
-                color: isDarkMode ? 'white' : '#2d3436'
-              }}>
-                <div className="mb-2">
-                  <i className="bi bi-magic fs-5 opacity-75"></i>
-                </div>
-                <p className="small mb-2">
-                  "試著從不同角度描述這個場景，也許可以加入一些感官細節來讓讀者更身臨其境。"
-                </p>
-                <Button 
-                  variant={isDarkMode ? "outline-light" : "outline-primary"} 
-                  size="sm" 
-                  className="w-100"
-                  style={{ borderRadius: '8px' }}
-                >
-                  <i className="bi bi-arrow-clockwise me-1"></i>
-                  獲取新建議
-                </Button>
-              </div>
-            </div>
-
-            {/* 草稿版本切換器 */}
-            <div className="mb-4">
-              <h6 className={`mb-3 fw-bold ${isDarkMode ? 'text-white' : 'text-dark'}`}>
-                <i className="bi bi-file-earmark-text me-2" style={{ color: '#9b59b6' }}></i>
-                草稿版本
-              </h6>
-              <select 
-                className="form-select"
-                style={{
-                  background: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.8)',
-                  border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}`,
-                  color: isDarkMode ? 'white' : '#333',
-                  borderRadius: '10px'
-                }}
-              >
-                <option>當前版本 (v1.0)</option>
-                <option>草稿 v0.9</option>
-                <option>草稿 v0.8</option>
-              </select>
-              <div className="d-flex gap-2 mt-3">
-                <Button 
-                  variant={isDarkMode ? "outline-light" : "outline-primary"} 
-                  size="sm"
-                  style={{ borderRadius: '8px' }}
-                >
-                  <i className="bi bi-save me-1"></i>存為新草稿
-                </Button>
-                <Button 
-                  variant={isDarkMode ? "outline-warning" : "outline-secondary"} 
-                  size="sm"
-                  style={{ borderRadius: '8px' }}
-                >
-                  <i className="bi bi-arrow-counterclockwise me-1"></i>還原
-                </Button>
-              </div>
-            </div>
+            <StatsPanel
+              chapters={chapters}
+              dailyGoal={dailyGoal}
+              wordCount={wordCount}
+              isDarkMode={isDarkMode}
+              setDailyGoal={setDailyGoal}
+            />
+            {/* 這裡可根據 activeTab === 'settings' 顯示設定面板 */}
+            {activeTab === 'settings' && (
+              <SettingsPanel isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
+            )}
           </div>
         </Col>
       </Row>

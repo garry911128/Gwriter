@@ -1,5 +1,5 @@
 import React from "react";
-import NovelEditor from "../components/NovelEditor"; // 引入小說編輯器
+import NovelEditor from "../components/NovelEditor/NovelEditor"; // 引入小說編輯器
 import { Container } from "react-bootstrap";
 
 export function Edit() {
