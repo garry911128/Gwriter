@@ -16,7 +16,7 @@ export function Navbar() {
                 <Nav.Link to="/store" as={NavLink}>
                     Store
                 </Nav.Link>
-                <Nav.Link to ='/edit' as={NavLink}>
+                <Nav.Link to="/edit" as={NavLink}>
                     Edit
                 </Nav.Link>
                 <Nav.Link to="/about" as={NavLink}>
