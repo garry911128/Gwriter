@@ -68,3 +68,6 @@ Thumbs.db
 *.gz
 *.7z
 *.zip
+
+# Claude Code custom commands (個人 prompt，不納入版控)
+.claude/commands/
