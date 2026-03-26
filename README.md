@@ -1,119 +1,123 @@
-# Project README
+# GWriter — 小說寫作平台
+
+AI 輔助的本地小說創作工具，整合 Ollama 語言模型提供繁體中文寫作建議。
 
 ## Tech Stack
-- **Frontend**: Vite + TypeScript
-- **Backend**: Golang
-- **Database**: MySQL
+
+| 層級 | 技術 |
+|------|------|
+| Frontend | React 18 + TypeScript + Vite + Tailwind CSS + Bootstrap 5 |
+| Backend | Go 1.21 + Gorilla Mux |
+| Database | MySQL 5.7（Docker） |
+| AI | Ollama（llama3 / 自訂 gwriter 模型） |
 
 ## Prerequisites
-Ensure you have the following installed:
-- Git
-- Docker
-- NPM
-- Go
-- MySQL
 
-## How to Run
+- [Git](https://git-scm.com/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Node.js 18+](https://nodejs.org/) + npm
+- [Go 1.21+](https://go.dev/)
+- [Ollama](https://ollama.com/)
 
-### Frontend
-#### Setup Environment Variables
-```sh
-cd frontend
-cp .example.env .env
+## Quick Start（推薦）
+
+```powershell
+# 1. 設定執行政策（只需一次）
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# 2. 啟動所有服務（MySQL + Backend + Frontend）
+./dev.ps1
 ```
 
-- For local development:
-  ```sh
-  BACKEND_PATH='http://localhost:5000/api/v1'
-  ```
-- For Docker deployment:
-  ```sh
-  BACKEND_PATH='http://go-server:5000/api/v1'
-  ```
+服務啟動後：
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8080
+- **Database**: localhost:3307
 
-#### Install Dependencies
-```sh
+## AI 模型設定
+
+### 使用內建 llama3
+```bash
+ollama pull llama3
+```
+
+### 使用專屬小說寫作模型（推薦）
+```bash
+ollama create gwriter -f gwriter.modelfile
+```
+
+## 手動啟動
+
+### 1. 啟動資料庫
+```bash
+docker-compose up -d db
+```
+
+### 2. 啟動後端
+```bash
+cd backend
+$env:DATABASE_URL = "root:password@tcp(localhost:3307)/mydatabase"
+go run .
+```
+
+### 3. 啟動前端
+```bash
+cd frontend
 npm install --legacy-peer-deps
+npm run dev
 ```
 
-#### Run Locally
-```sh
-cd frontend
-npm run dev -- --open
-```
-The server will automatically reload after code changes.
+## Docker 完整部署
 
----
+```bash
+# 啟動全部容器
+docker-compose up --detach --build
 
-### Backend
-#### Setup Environment Variables
-```sh
-go mod download
+# 停止（保留資料）
+docker-compose down
+
+# 停止並刪除資料（⚠️ 不可逆）
+docker-compose down -v
 ```
 
-#### Run the Server
-```sh
-go run cmd/main.go
+## 資料庫管理
+
+```bash
+# 進入 MySQL（需安裝 MySQL client）
+mysql -h localhost -P 3307 -u root -ppassword mydatabase
+
+# 進入 MySQL（透過 Docker）
+docker exec -it gwriter-db-1 mysql -u root -ppassword mydatabase
 ```
 
----
+## 專案結構
 
-## Code Formatting & Linting
-### When to Check
-- Before opening a pull request
+```
+GWriter/
+├── backend/              # Go API server
+│   ├── main.go           # 路由設定
+│   ├── db.go             # 資料庫連線 + migration
+│   ├── models.go         # 資料結構
+│   ├── *_handlers.go     # 各模組 CRUD handler
+│   └── ai_handler.go     # Ollama AI proxy
+├── frontend/             # React + Vite
+│   └── src/
+│       ├── api/          # API client
+│       └── components/
+│           └── NovelEditor/  # 編輯器主體
+├── db/
+│   └── schema.sql        # 資料庫 schema
+├── gwriter.modelfile     # 自訂 Ollama 模型設定
+└── dev.ps1               # 開發環境啟動腳本
+```
 
-### Format Code
-```sh
+## Code Formatting
+
+```bash
+# Frontend
+npm run lint
 npm run format
+
+# Backend
 gofmt -w .
 ```
-
-### Check Code Format
-```sh
-npm run lint
-gofmt -l -d .
-```
-
----
-
-## Docker
-### Start Containers
-Run the project with Docker:
-```sh
-docker-compose up --detach --build
-```
-
-#### Run Only the Go Server
-If `go.mod` or `go.sum` has changed, rebuild the Go server image:
-```sh
-docker-compose up go-server
-```
-
-#### Run Only MySQL
-```sh
-docker-compose up mysql-db
-```
-
----
-
-## Database Initialization
-Place `.sql` files inside the `db` folder.
-
-#### Access MySQL
-If you have MySQL installed:
-```sh
-mysql -h localhost -P 3306 -u root -p
-```
-
-If you do not have MySQL installed:
-```sh
-docker exec -it <containerName> mysql -u root -p
-```
-
----
-
-## Shutdown Docker Containers
-```sh
-docker-compose down
-```
-
