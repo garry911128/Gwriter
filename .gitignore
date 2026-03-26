@@ -71,3 +71,6 @@ Thumbs.db
 
 # Claude Code custom commands (個人 prompt，不納入版控)
 .claude/commands/
+
+# 個人創作內容（存於 MySQL，不納入版控）
+my_novel/
