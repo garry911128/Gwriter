@@ -1,38 +1,39 @@
+version: "3.8"
+
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: go_backend
+    env_file:
+      - .env
     ports:
       - "8080:8080"
-    environment:
-      - DATABASE_URL=root:password@tcp(db:3306)/mydatabase
     restart: unless-stopped
     depends_on:
       - db
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ts_frontend
     ports:
       - "3000:80"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - CHOKIDAR_USEPOLLING=true
     restart: unless-stopped
     depends_on:
       - backend
 
   db:
-    image: mysql:5.7
-    environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: mydatabase
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
+    image: mysql:8.0
+    container_name: mysql_db
+    env_file:
+      - .env
     ports:
       - "3307:3306"
     volumes:
-      - db-data:/var/lib/mysql
+      - db_data:/var/lib/mysql
     restart: unless-stopped
 
   migrate:
@@ -42,6 +43,7 @@ services:
     volumes:
       - ./db/migrations:/migrations
     command: ["-path=/migrations", "-database=mysql://root:password@tcp(db:3306)/mydatabase", "up"]
-    
+
 volumes:
-  db-data:
+  db_data:
+    driver: local
