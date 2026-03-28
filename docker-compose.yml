@@ -31,7 +31,7 @@ services:
     env_file:
       - .env
     ports:
-      - "3307:3306"
+      - "3409:3306"
     volumes:
       - db_data:/var/lib/mysql
     restart: unless-stopped

@@ -168,7 +168,16 @@ const NovelEditor: React.FC = () => {
       if (newTitle !== undefined) data.title = newTitle;
       if (newContent !== undefined) data.content = newContent;
       const updated = await chaptersApi.update(chapterId, data);
-      setChapters(prev => prev.map(c => c.id === chapterId ? mapApiChapter(updated) : c));
+      setChapters(prev => prev.map(c => {
+        if (c.id !== chapterId) return c;
+        return {
+          ...c,
+          order: updated.order,
+          lastModified: new Date(updated.updated_at),
+          ...(newTitle !== undefined && { title: updated.title }),
+          ...(newContent !== undefined && { content: updated.content, wordCount: updated.word_count }),
+        };
+      }));
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch {
@@ -204,20 +213,35 @@ const NovelEditor: React.FC = () => {
 
   // ── 新增章節 ────────────────────────────────────────────────
   const handleAddChapter = useCallback(async () => {
+    if (currentChapterId !== null) {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      saveToApi(currentChapterId, title, content);
+    }
     const newTitle = `第${chapters.length + 1}章`;
     const created = await chaptersApi.create(newTitle, currentNovelId);
     const mapped = mapApiChapter(created);
     setChapters(prev => [...prev, mapped]);
-    handleChapterSelect(mapped.id);
-  }, [chapters.length, currentNovelId, handleChapterSelect]);
+    setCurrentChapterId(mapped.id);
+    setTitle(mapped.title);
+    setContent(mapped.content);
+    setWordCount(mapped.wordCount);
+  }, [chapters.length, currentNovelId, currentChapterId, title, content, saveToApi]);
 
   // ── 刪除章節 ────────────────────────────────────────────────
   const handleDeleteChapter = useCallback(async (chapterId: number) => {
-    if (chapters.length <= 1) return;
     await chaptersApi.delete(chapterId);
     const updated = chapters.filter(c => c.id !== chapterId);
     setChapters(updated);
-    if (currentChapterId === chapterId) handleChapterSelect(updated[0].id);
+    if (currentChapterId === chapterId) {
+      if (updated.length > 0) {
+        handleChapterSelect(updated[0].id);
+      } else {
+        setCurrentChapterId(null);
+        setTitle('');
+        setContent('');
+        setWordCount(0);
+      }
+    }
   }, [chapters, currentChapterId, handleChapterSelect]);
 
   // ── 標題變更 ────────────────────────────────────────────────
