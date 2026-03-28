@@ -73,7 +73,7 @@ const ChaptersList: React.FC<ChaptersListProps> = ({
               <div className="px-3 pt-3 pb-2">
                 <div className={`fw-bold text-truncate ${isActive ? 'text-white' : isDarkMode ? 'text-white' : 'text-dark'}`}
                   style={{ fontSize: '0.88rem' }}>
-                  {chapter.order}. {chapter.title}
+                  {idx + 1}. {chapter.title}
                 </div>
                 <div className={`small mt-1 ${isActive ? 'text-white opacity-75' : isDarkMode ? 'text-light opacity-50' : 'text-muted'}`}>
                   <i className="bi bi-file-text me-1"></i>{chapter.wordCount} 字
@@ -123,21 +123,19 @@ const ChaptersList: React.FC<ChaptersListProps> = ({
                   </div>
 
                   {/* 刪除膠囊 */}
-                  {chapters.length > 1 && (
-                    <button
-                      onClick={() => { if (window.confirm('確定刪除此章節？')) handleDeleteChapter(chapter.id); }}
-                      title="刪除"
-                      style={{
-                        padding: '5px 13px', border: 'none', borderRadius: '999px', cursor: 'pointer',
-                        background: 'rgba(231,76,60,0.18)', color: '#ff8a80',
-                        fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px',
-                        transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(231,76,60,0.4)'; e.currentTarget.style.color = '#fff'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(231,76,60,0.18)'; e.currentTarget.style.color = '#ff8a80'; }}>
-                      <i className="bi bi-trash3" style={{ fontSize: '0.75rem' }}></i>刪除
-                    </button>
-                  )}
+                  <button
+                    onClick={() => { if (window.confirm('確定刪除此章節？')) handleDeleteChapter(chapter.id); }}
+                    title="刪除"
+                    style={{
+                      padding: '5px 13px', border: 'none', borderRadius: '999px', cursor: 'pointer',
+                      background: 'rgba(231,76,60,0.18)', color: '#ff8a80',
+                      fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(231,76,60,0.4)'; e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(231,76,60,0.18)'; e.currentTarget.style.color = '#ff8a80'; }}>
+                    <i className="bi bi-trash3" style={{ fontSize: '0.75rem' }}></i>刪除
+                  </button>
                 </div>
               )}
             </div>

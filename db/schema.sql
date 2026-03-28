@@ -2,6 +2,9 @@
 -- 使用 CREATE TABLE IF NOT EXISTS 確保冪等性
 -- 資料庫由 docker-compose MYSQL_DATABASE 環境變數建立
 
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(100) NOT NULL,

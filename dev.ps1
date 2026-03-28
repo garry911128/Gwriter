@@ -14,7 +14,7 @@ Start-Sleep -Seconds 5
 
 # 2. Start Go backend in new window
 Write-Host "[2/3] Starting Go backend (port 8080)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$ROOT\backend'; `$env:DATABASE_URL='root:password@tcp(localhost:3307)/mydatabase'; go run ." -WindowStyle Normal
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$ROOT\backend'; `$env:DATABASE_URL='root:password@tcp(localhost:3409)/mydatabase'; go run ." -WindowStyle Normal
 
 Start-Sleep -Seconds 2
 
