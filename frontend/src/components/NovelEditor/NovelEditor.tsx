@@ -107,7 +107,12 @@ const NovelEditor: React.FC = () => {
     if (!currentNovelId) return;
     // 載入角色與世界觀供 AI 使用
     charactersApi.list(currentNovelId).then(list => {
-      setAiCharacters(list.map(c => `${c.name}（${c.role}）：${c.description}`));
+      setAiCharacters(list.map(c => {
+        const parts = [`${c.name}（${c.role}）：${c.description}`];
+        if (c.personality) parts.push(`個性：${c.personality}`);
+        if (c.background) parts.push(`背景：${c.background}`);
+        return parts.join('｜');
+      }));
     }).catch(() => {});
     worldApi.list(currentNovelId).then(list => {
       setAiWorld(list.map(w => `${w.name}（${w.category}）：${w.description}`));
@@ -468,6 +473,11 @@ const NovelEditor: React.FC = () => {
             <AIAssistant
               isDarkMode={isDarkMode}
               content={content}
+              context={{
+                characters: aiCharacters,
+                world: aiWorld,
+                novel_title: currentNovel?.title,
+              }}
               onApplySuggestion={text => setContent(prev => prev + '<p>' + text + '</p>')}
               onSuggestTitle={t => {
                 setTitle(t);
