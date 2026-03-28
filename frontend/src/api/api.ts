@@ -52,7 +52,7 @@ export interface ApiDraft {
   saved_at: string;
 }
 
-export type AISuggestType = 'continue' | 'improve' | 'dialogue' | 'plot' | 'title';
+export type AISuggestType = 'continue' | 'improve' | 'dialogue' | 'plot' | 'title' | 'emotion' | 'scene';
 
 // ── Core request ───────────────────────────────────────────────
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
