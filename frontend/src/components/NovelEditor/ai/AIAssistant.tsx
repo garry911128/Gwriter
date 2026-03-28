@@ -15,6 +15,8 @@ const SUGGEST_TYPES: { type: AISuggestType; label: string; icon: string }[] = [
   { type: 'improve', label: '改善文筆', icon: 'bi-stars' },
   { type: 'dialogue', label: '設計對話', icon: 'bi-chat-quote' },
   { type: 'plot', label: '情節建議', icon: 'bi-diagram-3' },
+  { type: 'emotion', label: '情緒描寫', icon: 'bi-heart-pulse' },
+  { type: 'scene', label: '場景描寫', icon: 'bi-image' },
   { type: 'title', label: '建議標題', icon: 'bi-fonts' },
 ];
 

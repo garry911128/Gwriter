@@ -23,6 +23,13 @@ type ollamaRequest struct {
 	Stream   bool            `json:"stream"`
 }
 
+const systemPrompt = `你是一位資深中文小說寫作助理，專精於各類型故事創作與敘事技巧。
+規則：
+- 嚴格保持原文的敘事人稱（第一人稱／第三人稱）、時態與文學風格
+- 所有輸出必須符合提供的角色設定與世界觀，不得自行增加設定
+- 使用流暢自然的繁體中文
+- 直接輸出創作內容，不加任何前言、說明、標籤或分隔線`
+
 type ollamaResponse struct {
 	Message ollamaMessage `json:"message"`
 }
@@ -32,8 +39,8 @@ func aiSuggest(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Content    string   `json:"content"`
 		Type       string   `json:"type"`
-		Characters []string `json:"characters"`  // ["角色名 (role): 描述", ...]
-		World      []string `json:"world"`        // ["地點名 (category): 描述", ...]
+		Characters []string `json:"characters"` // ["角色名（role）：描述｜個性｜背景", ...]
+		World      []string `json:"world"`       // ["地點名（category）：描述", ...]
 		NovelTitle string   `json:"novel_title"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -86,27 +93,37 @@ func aiSuggest(w http.ResponseWriter, r *http.Request) {
 	switch input.Type {
 	case "continue":
 		userPrompt = fmt.Sprintf(
-			"請根據以下資料，繼續寫接下來約 150 字的故事內容。風格、語氣、人稱必須與原文完全一致。直接輸出續寫內容，不要加任何說明。\n\n%s",
+			"根據以下資料，續寫接下來約 150 字的故事。要求：人稱、時態、語氣與原文完全一致；情節自然銜接，不重複已有內容；直接輸出續寫段落。\n\n%s",
 			chapterSection,
 		)
 	case "improve":
 		userPrompt = fmt.Sprintf(
-			"請分析以下文段，給出 3 點具體的文筆改善建議。每點須包含：問題所在、改善方向、並附上改寫示例。\n\n%s",
+			"分析以下文段的文筆，提供 3 點具體改善建議。每點格式：\n【問題】→【建議】→【改寫示例】\n\n%s",
 			chapterSection,
 		)
 	case "dialogue":
 		userPrompt = fmt.Sprintf(
-			"請根據以下故事情境與角色設定，為角色設計一段自然流暢的對話（約 80-120 字）。對話需反映角色個性，直接輸出對話內容。\n\n%s",
+			"根據以下故事情境與角色設定，創作一段對話（約 80-120 字）。要求：每句台詞需反映說話者的個性與身分；加入適當動作描述或語氣詞；直接輸出對話。\n\n%s",
 			chapterSection,
 		)
 	case "plot":
 		userPrompt = fmt.Sprintf(
-			"請根據以下故事進度，提出 3 個有張力且合乎邏輯的情節發展方向。每個方向用一句話概述，再用 2-3 句說明其吸引人之處。\n\n%s",
+			"根據以下故事進度，提出 3 個情節發展方向。格式：\n【方向N】一句話概述\n理由：2-3 句說明戲劇張力與吸引力\n\n%s",
 			chapterSection,
 		)
 	case "title":
 		userPrompt = fmt.Sprintf(
-			"請根據以下章節內容，建議 3 個簡短有力的章節標題。每行一個，不加編號、不加說明，只輸出標題本身。\n\n%s",
+			"根據以下章節內容，建議 3 個章節標題。要求：標題簡短有力（4-8 字為佳）、帶懸念感或情感張力；每行一個，僅輸出標題，不加編號或說明。\n\n%s",
+			chapterSection,
+		)
+	case "emotion":
+		userPrompt = fmt.Sprintf(
+			"根據以下故事情境，為主要角色撰寫一段細膩的心理描寫（約 100-150 字）。要求：深入刻畫角色的情緒波動與內心獨白；運用意象或感官細節強化情感表達；保持與原文一致的人稱與文風，直接輸出。\n\n%s",
+			chapterSection,
+		)
+	case "scene":
+		userPrompt = fmt.Sprintf(
+			"根據以下故事情境，撰寫一段場景環境描寫（約 100-150 字）。要求：運用視覺、聽覺、嗅覺等多感官細節；場景氛圍需與當下故事情緒呼應；保持原文文風，直接輸出描寫段落。\n\n%s",
 			chapterSection,
 		)
 	default:
@@ -116,6 +133,7 @@ func aiSuggest(w http.ResponseWriter, r *http.Request) {
 	reqBody := ollamaRequest{
 		Model: model,
 		Messages: []ollamaMessage{
+			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
 		Stream: false,
