@@ -6,9 +6,10 @@ use rusqlite::{params, Connection};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::{Card, CardType, SaveCardInput};
+use crate::domain::{Card, CardRelationship, CardType, SaveCardInput, SaveCardRelationshipInput};
 
 const CARDS_MIGRATION: &str = include_str!("../migrations/000003_cards.sql");
+const RELATIONSHIPS_MIGRATION: &str = include_str!("../migrations/000004_card_relationships.sql");
 
 #[derive(Debug, Error)]
 pub enum CardError {
@@ -18,6 +19,10 @@ pub enum CardError {
     InvalidDetails,
     #[error("設定狀態無效")]
     InvalidCanonStatus,
+    #[error("關係類型不可空白，且兩端必須是不同卡牌")]
+    InvalidRelationship,
+    #[error("關係方向或狀態無效")]
+    InvalidRelationshipState,
     #[error("找不到作品、卡牌或卡牌類型")]
     NotFound,
     #[error("資料庫操作失敗")]
@@ -38,6 +43,12 @@ impl CardRepository {
             let transaction = connection.transaction()?;
             transaction.execute_batch(CARDS_MIGRATION)?;
             transaction.pragma_update(None, "user_version", 3)?;
+            transaction.commit()?;
+        }
+        if version < 4 {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(RELATIONSHIPS_MIGRATION)?;
+            transaction.pragma_update(None, "user_version", 4)?;
             transaction.commit()?;
         }
         Ok(Self {
@@ -159,6 +170,136 @@ impl CardRepository {
         }
         Ok(())
     }
+
+    pub fn list_relationships(&self, work_id: &str) -> Result<Vec<CardRelationship>, CardError> {
+        let connection = self.connection.lock().expect("card mutex poisoned");
+        let mut statement = connection.prepare(
+            "SELECT r.id, r.work_id, r.source_card_id, source.name, r.target_card_id, target.name,
+                    r.relationship_type, r.description, r.direction, r.starts_at, r.ends_at,
+                    r.status, r.is_secret, r.created_at, r.updated_at
+             FROM card_relationships r
+             JOIN cards source ON source.id = r.source_card_id
+             JOIN cards target ON target.id = r.target_card_id
+             WHERE r.work_id = ?1 AND r.deleted_at IS NULL
+               AND source.deleted_at IS NULL AND target.deleted_at IS NULL
+             ORDER BY r.created_at, r.id",
+        )?;
+        let relationships = statement
+            .query_map([work_id], map_relationship)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(relationships)
+    }
+
+    pub fn save_relationship(
+        &self,
+        input: SaveCardRelationshipInput,
+    ) -> Result<CardRelationship, CardError> {
+        let relationship_type = input.relationship_type.trim();
+        if relationship_type.is_empty() || input.source_card_id == input.target_card_id {
+            return Err(CardError::InvalidRelationship);
+        }
+        if !matches!(
+            input.direction.as_str(),
+            "directed" | "bidirectional" | "undirected"
+        ) || !matches!(
+            input.status.as_str(),
+            "active" | "planned" | "past" | "unknown"
+        ) {
+            return Err(CardError::InvalidRelationshipState);
+        }
+        let id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        let now = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        let mut connection = self.connection.lock().expect("card mutex poisoned");
+        let transaction = connection.transaction()?;
+        let valid_endpoints: i64 = transaction.query_row(
+            "SELECT COUNT(*) FROM cards WHERE work_id = ?1 AND id IN (?2, ?3) AND deleted_at IS NULL",
+            params![input.work_id, input.source_card_id, input.target_card_id],
+            |row| row.get(0),
+        )?;
+        if valid_endpoints != 2 {
+            return Err(CardError::NotFound);
+        }
+        let existing: bool = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM card_relationships WHERE id = ?1)",
+            [&id],
+            |row| row.get(0),
+        )?;
+        if existing {
+            let changed = transaction.execute(
+                "UPDATE card_relationships SET source_card_id = ?1, target_card_id = ?2,
+                    relationship_type = ?3, description = ?4, direction = ?5, starts_at = ?6,
+                    ends_at = ?7, status = ?8, is_secret = ?9, updated_at = ?10
+                 WHERE id = ?11 AND work_id = ?12 AND deleted_at IS NULL",
+                params![
+                    input.source_card_id,
+                    input.target_card_id,
+                    relationship_type,
+                    input.description.trim(),
+                    input.direction,
+                    input.starts_at,
+                    input.ends_at,
+                    input.status,
+                    input.is_secret,
+                    now,
+                    id,
+                    input.work_id
+                ],
+            )?;
+            if changed == 0 {
+                return Err(CardError::NotFound);
+            }
+        } else {
+            transaction.execute(
+                "INSERT INTO card_relationships
+                    (id, work_id, source_card_id, target_card_id, relationship_type, description,
+                     direction, starts_at, ends_at, status, is_secret, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)",
+                params![
+                    id,
+                    input.work_id,
+                    input.source_card_id,
+                    input.target_card_id,
+                    relationship_type,
+                    input.description.trim(),
+                    input.direction,
+                    input.starts_at,
+                    input.ends_at,
+                    input.status,
+                    input.is_secret,
+                    now
+                ],
+            )?;
+        }
+        let relationship = transaction.query_row(
+            "SELECT r.id, r.work_id, r.source_card_id, source.name, r.target_card_id, target.name,
+                    r.relationship_type, r.description, r.direction, r.starts_at, r.ends_at,
+                    r.status, r.is_secret, r.created_at, r.updated_at
+             FROM card_relationships r JOIN cards source ON source.id = r.source_card_id
+             JOIN cards target ON target.id = r.target_card_id WHERE r.id = ?1",
+            [&id],
+            map_relationship,
+        )?;
+        transaction.commit()?;
+        Ok(relationship)
+    }
+
+    pub fn delete_relationship(
+        &self,
+        work_id: &str,
+        relationship_id: &str,
+    ) -> Result<(), CardError> {
+        let now = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        let connection = self.connection.lock().expect("card mutex poisoned");
+        let changed = connection.execute(
+            "UPDATE card_relationships SET deleted_at = ?1, updated_at = ?1
+             WHERE id = ?2 AND work_id = ?3 AND deleted_at IS NULL",
+            params![now, relationship_id, work_id],
+        )?;
+        if changed == 0 {
+            return Err(CardError::NotFound);
+        }
+        Ok(())
+    }
 }
 
 fn map_card(row: &rusqlite::Row<'_>) -> Result<Card, rusqlite::Error> {
@@ -176,6 +317,26 @@ fn map_card(row: &rusqlite::Row<'_>) -> Result<Card, rusqlite::Error> {
         tags: serde_json::from_str(&tags).unwrap_or_default(),
         created_at: row.get(9)?,
         updated_at: row.get(10)?,
+    })
+}
+
+fn map_relationship(row: &rusqlite::Row<'_>) -> Result<CardRelationship, rusqlite::Error> {
+    Ok(CardRelationship {
+        id: row.get(0)?,
+        work_id: row.get(1)?,
+        source_card_id: row.get(2)?,
+        source_card_name: row.get(3)?,
+        target_card_id: row.get(4)?,
+        target_card_name: row.get(5)?,
+        relationship_type: row.get(6)?,
+        description: row.get(7)?,
+        direction: row.get(8)?,
+        starts_at: row.get(9)?,
+        ends_at: row.get(10)?,
+        status: row.get(11)?,
+        is_secret: row.get::<_, i64>(12)? != 0,
+        created_at: row.get(13)?,
+        updated_at: row.get(14)?,
     })
 }
 
@@ -227,5 +388,81 @@ mod tests {
             tags: vec![],
         });
         assert!(matches!(result, Err(CardError::NotFound)));
+    }
+
+    #[test]
+    fn relationship_requires_two_active_cards_in_the_same_work() {
+        let (_directory, library, cards) = repositories();
+        let work = library.create_work(None).unwrap();
+        let other_work = library.create_work(Some("另一部作品")).unwrap();
+        let source = cards
+            .save_card(SaveCardInput {
+                id: None,
+                work_id: work.id.clone(),
+                type_id: "builtin-character".into(),
+                name: "阿黎".into(),
+                canon_status: "confirmed".into(),
+                summary: String::new(),
+                details: serde_json::json!({}),
+                tags: vec![],
+            })
+            .unwrap();
+        let target = cards
+            .save_card(SaveCardInput {
+                id: None,
+                work_id: work.id.clone(),
+                type_id: "builtin-character".into(),
+                name: "沈川".into(),
+                canon_status: "confirmed".into(),
+                summary: String::new(),
+                details: serde_json::json!({}),
+                tags: vec![],
+            })
+            .unwrap();
+        let foreign = cards
+            .save_card(SaveCardInput {
+                id: None,
+                work_id: other_work.id,
+                type_id: "builtin-location".into(),
+                name: "遠城".into(),
+                canon_status: "confirmed".into(),
+                summary: String::new(),
+                details: serde_json::json!({}),
+                tags: vec![],
+            })
+            .unwrap();
+
+        let relationship = cards
+            .save_relationship(SaveCardRelationshipInput {
+                id: None,
+                work_id: work.id.clone(),
+                source_card_id: source.id.clone(),
+                target_card_id: target.id,
+                relationship_type: "師徒".into(),
+                description: "彼此信任".into(),
+                direction: "directed".into(),
+                starts_at: None,
+                ends_at: None,
+                status: "active".into(),
+                is_secret: false,
+            })
+            .unwrap();
+        assert_eq!(relationship.source_card_name, "阿黎");
+        assert_eq!(cards.list_relationships(&work.id).unwrap().len(), 1);
+
+        let invalid = cards.save_relationship(SaveCardRelationshipInput {
+            id: None,
+            work_id: work.id,
+            source_card_id: source.id,
+            target_card_id: foreign.id,
+            relationship_type: "知道".into(),
+            description: String::new(),
+            direction: "directed".into(),
+            starts_at: None,
+            ends_at: None,
+            status: "unknown".into(),
+            is_secret: true,
+        });
+        assert!(matches!(invalid, Err(CardError::NotFound)));
     }
 }

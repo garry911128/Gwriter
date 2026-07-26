@@ -45,3 +45,38 @@ export const canonStatusLabels: Record<CanonStatus, string> = {
   tentative: "暫定構想",
   deprecated: "已棄用",
 };
+
+export type RelationshipDirection = "directed" | "bidirectional" | "undirected";
+export type RelationshipStatus = "active" | "planned" | "past" | "unknown";
+
+export interface CardRelationship {
+  id: string;
+  workId: string;
+  sourceCardId: string;
+  sourceCardName: string;
+  targetCardId: string;
+  targetCardName: string;
+  relationshipType: string;
+  description: string;
+  direction: RelationshipDirection;
+  startsAt?: string;
+  endsAt?: string;
+  status: RelationshipStatus;
+  isSecret: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveCardRelationshipInput {
+  id?: string;
+  workId: string;
+  sourceCardId: string;
+  targetCardId: string;
+  relationshipType: string;
+  description?: string;
+  direction: RelationshipDirection;
+  startsAt?: string;
+  endsAt?: string;
+  status: RelationshipStatus;
+  isSecret?: boolean;
+}

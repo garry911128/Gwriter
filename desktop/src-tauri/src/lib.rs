@@ -4,8 +4,8 @@ mod library;
 
 use cards::CardRepository;
 use domain::{
-    Card, CardType, ChapterDocument, DocumentVersionSummary, RecoveryDraft, SaveCardInput,
-    WorkSummary,
+    Card, CardRelationship, CardType, ChapterDocument, DocumentVersionSummary, RecoveryDraft,
+    SaveCardInput, SaveCardRelationshipInput, WorkSummary,
 };
 use library::LibraryRepository;
 use tauri::Manager;
@@ -149,6 +149,37 @@ fn delete_card(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn list_card_relationships(
+    work_id: String,
+    repository: tauri::State<'_, CardRepository>,
+) -> Result<Vec<CardRelationship>, String> {
+    repository
+        .list_relationships(&work_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn save_card_relationship(
+    input: SaveCardRelationshipInput,
+    repository: tauri::State<'_, CardRepository>,
+) -> Result<CardRelationship, String> {
+    repository
+        .save_relationship(input)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn delete_card_relationship(
+    work_id: String,
+    relationship_id: String,
+    repository: tauri::State<'_, CardRepository>,
+) -> Result<(), String> {
+    repository
+        .delete_relationship(&work_id, &relationship_id)
+        .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -177,7 +208,10 @@ pub fn run() {
             list_card_types,
             list_cards,
             save_card,
-            delete_card
+            delete_card,
+            list_card_relationships,
+            save_card_relationship,
+            delete_card_relationship
         ])
         .run(tauri::generate_context!())
         .expect("GWriter failed to start");

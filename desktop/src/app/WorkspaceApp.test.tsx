@@ -29,4 +29,25 @@ describe("WorkspaceApp", () => {
     expect(await screen.findByRole("heading", { name: "林清越" })).toBeVisible();
     expect(screen.getByText("確定設定")).toBeVisible();
   });
+
+  it("lets the author explicitly connect two cards", async () => {
+    const user = userEvent.setup();
+    render(<WorkspaceApp gateway={new MemoryLibraryGateway()} />);
+    await screen.findByText("開始第一部作品");
+    await user.click(screen.getByText("建立作品", { selector: "button.button--primary" }));
+    await screen.findByRole("heading", { name: "第一章" });
+    await user.click(screen.getByRole("button", { name: "創作卡牌" }));
+
+    for (const name of ["阿黎", "沈川"]) {
+      await user.click(screen.getByRole("button", { name: screen.queryByRole("button", { name: "建立第一張卡牌" }) ? "建立第一張卡牌" : "＋ 新增卡牌" }));
+      await user.type(screen.getByLabelText(/名稱/), name);
+      await user.click(screen.getByRole("button", { name: /^建立$/ }));
+    }
+
+    await user.click(screen.getByRole("button", { name: "＋ 新增關係" }));
+    await user.type(screen.getByLabelText(/關係名稱/), "師徒");
+    await user.click(screen.getByRole("button", { name: "建立關係" }));
+    expect(await screen.findByText("師徒 · 目前成立")).toBeVisible();
+    expect(screen.getByLabelText("directed")).toBeVisible();
+  });
 });

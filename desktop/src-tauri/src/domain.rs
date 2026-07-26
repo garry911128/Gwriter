@@ -93,6 +93,44 @@ pub struct SaveCardInput {
     pub tags: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRelationship {
+    pub id: String,
+    pub work_id: String,
+    pub source_card_id: String,
+    pub source_card_name: String,
+    pub target_card_id: String,
+    pub target_card_name: String,
+    pub relationship_type: String,
+    pub description: String,
+    pub direction: String,
+    pub starts_at: Option<String>,
+    pub ends_at: Option<String>,
+    pub status: String,
+    pub is_secret: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveCardRelationshipInput {
+    pub id: Option<String>,
+    pub work_id: String,
+    pub source_card_id: String,
+    pub target_card_id: String,
+    pub relationship_type: String,
+    #[serde(default)]
+    pub description: String,
+    pub direction: String,
+    pub starts_at: Option<String>,
+    pub ends_at: Option<String>,
+    pub status: String,
+    #[serde(default)]
+    pub is_secret: bool,
+}
+
 fn empty_object() -> serde_json::Value {
     serde_json::json!({})
 }

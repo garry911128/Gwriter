@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary } from "../../entities/library";
-import type { Card, CardType, SaveCardInput } from "../../entities/cards";
+import type { Card, CardRelationship, CardType, SaveCardInput, SaveCardRelationshipInput } from "../../entities/cards";
 
 export interface LibraryGateway {
   listWorks(): Promise<WorkSummary[]>;
@@ -17,6 +17,9 @@ export interface LibraryGateway {
   listCards(workId: string): Promise<Card[]>;
   saveCard(input: SaveCardInput): Promise<Card>;
   deleteCard(workId: string, cardId: string): Promise<void>;
+  listCardRelationships(workId: string): Promise<CardRelationship[]>;
+  saveCardRelationship(input: SaveCardRelationshipInput): Promise<CardRelationship>;
+  deleteCardRelationship(workId: string, relationshipId: string): Promise<void>;
 }
 
 export class TauriLibraryGateway implements LibraryGateway {
@@ -34,6 +37,9 @@ export class TauriLibraryGateway implements LibraryGateway {
   listCards(workId: string) { return invoke<Card[]>("list_cards", { workId }); }
   saveCard(input: SaveCardInput) { return invoke<Card>("save_card", { input }); }
   deleteCard(workId: string, cardId: string) { return invoke<void>("delete_card", { workId, cardId }); }
+  listCardRelationships(workId: string) { return invoke<CardRelationship[]>("list_card_relationships", { workId }); }
+  saveCardRelationship(input: SaveCardRelationshipInput) { return invoke<CardRelationship>("save_card_relationship", { input }); }
+  deleteCardRelationship(workId: string, relationshipId: string) { return invoke<void>("delete_card_relationship", { workId, relationshipId }); }
 }
 
 export class MemoryLibraryGateway implements LibraryGateway {
@@ -43,6 +49,7 @@ export class MemoryLibraryGateway implements LibraryGateway {
   private versions = new Map<string, DocumentVersionSummary[]>();
   private versionTexts = new Map<string, string>();
   private cards = new Map<string, Card[]>();
+  private relationships = new Map<string, CardRelationship[]>();
   private readonly cardTypes: CardType[] = [
     { id: "builtin-character", name: "人物", icon: "人", color: "#9c4f32", fieldSchema: [], isBuiltin: true },
     { id: "builtin-scene", name: "場景", icon: "景", color: "#526d82", fieldSchema: [], isBuiltin: true },
@@ -66,6 +73,7 @@ export class MemoryLibraryGateway implements LibraryGateway {
     this.documents.set(chapterId, { chapterId, schemaVersion: 1, text: "", savedAt: now });
     this.versions.set(chapterId, []);
     this.cards.set(workId, []);
+    this.relationships.set(workId, []);
     return structuredClone(work);
   }
 
@@ -132,6 +140,25 @@ export class MemoryLibraryGateway implements LibraryGateway {
     const collection = this.cards.get(workId) ?? [];
     const index = collection.findIndex((card) => card.id === cardId);
     if (index < 0) throw new Error("找不到卡牌");
+    collection.splice(index, 1);
+  }
+  async listCardRelationships(workId: string) { return structuredClone(this.relationships.get(workId) ?? []); }
+  async saveCardRelationship(input: SaveCardRelationshipInput) {
+    const cards = this.cards.get(input.workId) ?? [];
+    const source = cards.find((card) => card.id === input.sourceCardId);
+    const target = cards.find((card) => card.id === input.targetCardId);
+    if (!source || !target || source.id === target.id || !input.relationshipType.trim()) throw new Error("關係資料無效");
+    const collection = this.relationships.get(input.workId)!;
+    const existing = collection.find((item) => item.id === input.id);
+    const now = new Date().toISOString();
+    const relationship: CardRelationship = { id: existing?.id ?? crypto.randomUUID(), workId: input.workId, sourceCardId: source.id, sourceCardName: source.name, targetCardId: target.id, targetCardName: target.name, relationshipType: input.relationshipType.trim(), description: input.description?.trim() ?? "", direction: input.direction, startsAt: input.startsAt, endsAt: input.endsAt, status: input.status, isSecret: input.isSecret ?? false, createdAt: existing?.createdAt ?? now, updatedAt: now };
+    if (existing) collection.splice(collection.indexOf(existing), 1, relationship); else collection.push(relationship);
+    return structuredClone(relationship);
+  }
+  async deleteCardRelationship(workId: string, relationshipId: string) {
+    const collection = this.relationships.get(workId) ?? [];
+    const index = collection.findIndex((item) => item.id === relationshipId);
+    if (index < 0) throw new Error("找不到關係");
     collection.splice(index, 1);
   }
 }

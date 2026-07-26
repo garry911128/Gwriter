@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Card, CardType, CanonStatus } from "../entities/cards";
 import { canonStatusLabels } from "../entities/cards";
 import type { LibraryGateway } from "../shared/api/libraryGateway";
+import { CardRelationships } from "./CardRelationships";
 
 export function CardWorkspace({ workId, gateway, onError }: { workId?: string; gateway: LibraryGateway; onError(message: string): void }) {
   const [types, setTypes] = useState<CardType[]>([]);
@@ -48,6 +49,7 @@ export function CardWorkspace({ workId, gateway, onError }: { workId?: string; g
         const type = types.find((item) => item.id === card.typeId);
         return <article className="story-card" key={card.id} style={{ "--card-color": type?.color } as React.CSSProperties}><div className="story-card-icon" aria-hidden="true">{type?.icon ?? "卡"}</div><div><span className={`canon canon--${card.canonStatus}`}>{canonStatusLabels[card.canonStatus]}</span><h3>{card.name}</h3><small>{card.typeName}</small><p>{card.summary || "尚未填寫摘要"}</p></div></article>;
       })}</div> : !creating && <div className="empty-state"><div className="empty-glyph" aria-hidden="true">卡</div><h2>卡牌是選用的</h2><p>需要整理人物、場景或世界設定時再建立；不會阻擋正文。</p><button className="button button--primary" onClick={() => setCreating(true)}>建立第一張卡牌</button></div>}
+      <CardRelationships workId={workId} cards={cards} gateway={gateway} onError={onError} />
     </div>}
   </main>;
 }
