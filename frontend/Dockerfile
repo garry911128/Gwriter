@@ -13,6 +13,10 @@ RUN npm ci
 # 複製專案代碼
 COPY . .
 
+# 後端 API 位址在 build time 注入（Vite 會把 import.meta.env 編進 bundle）
+ARG VITE_API_BASE=http://localhost:8080/api/v1
+ENV VITE_API_BASE=$VITE_API_BASE
+
 # 執行 Vite 打包
 RUN npm run build
 

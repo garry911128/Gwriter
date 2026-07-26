@@ -1,12 +1,13 @@
 package main
 
 import (
-	"encoding/json"
+	"database/sql"
+	"errors"
 	"net/http"
 	"time"
-
-	"github.com/gorilla/mux"
 )
+
+const draftPreviewRunes = 60
 
 type Draft struct {
 	ID        int       `json:"id"`
@@ -16,9 +17,25 @@ type Draft struct {
 	SavedAt   time.Time `json:"saved_at"`
 }
 
-// GET /api/v1/chapters/:chapterId/drafts
+// draftPreview 產生純文字預覽，前端列表只顯示這一段。
+func draftPreview(content string) string {
+	plain := htmlTagRe.ReplaceAllString(content, "")
+	runes := []rune(plain)
+	if len(runes) > draftPreviewRunes {
+		return string(runes[:draftPreviewRunes]) + "..."
+	}
+	return plain
+}
+
+// GET /api/v1/chapters/{chapterId}/drafts
 func getDrafts(w http.ResponseWriter, r *http.Request) {
-	chapterID := mux.Vars(r)["chapterId"]
+	chapterID, ok := pathID(w, r, "chapterId")
+	if !ok {
+		return
+	}
+	if !ensureOwnsChapter(w, chapterID, authorID(r)) {
+		return
+	}
 
 	rows, err := DB.Query(
 		`SELECT id, chapter_id, COALESCE(content,''), saved_at
@@ -26,7 +43,7 @@ func getDrafts(w http.ResponseWriter, r *http.Request) {
 		chapterID,
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, "getDrafts query", err)
 		return
 	}
 	defer rows.Close()
@@ -35,81 +52,117 @@ func getDrafts(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var d Draft
 		if err := rows.Scan(&d.ID, &d.ChapterID, &d.Content, &d.SavedAt); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, "getDrafts scan", err)
 			return
 		}
-		// 產生純文字預覽（前 60 字）
-		plain := htmlTagRe.ReplaceAllString(d.Content, "")
-		runes := []rune(plain)
-		if len(runes) > 60 {
-			d.Preview = string(runes[:60]) + "..."
-		} else {
-			d.Preview = plain
-		}
-		// 不回傳完整 content 以節省流量，restore 時再取
+		d.Preview = draftPreview(d.Content)
+		// 列表不回傳完整 content 以節省流量，restore 時再取。
 		d.Content = ""
 		drafts = append(drafts, d)
 	}
+	if err := rows.Err(); err != nil {
+		serverError(w, "getDrafts rows", err)
+		return
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(drafts)
+	writeJSON(w, http.StatusOK, drafts)
 }
 
-// POST /api/v1/chapters/:chapterId/drafts
+// POST /api/v1/chapters/{chapterId}/drafts
 func createDraft(w http.ResponseWriter, r *http.Request) {
-	chapterID := mux.Vars(r)["chapterId"]
+	chapterID, ok := pathID(w, r, "chapterId")
+	if !ok {
+		return
+	}
+	if !ensureOwnsChapter(w, chapterID, authorID(r)) {
+		return
+	}
 
 	var input struct {
 		Content string `json:"content"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if !decodeJSON(w, r, maxContentBody, &input) {
 		return
 	}
 
 	result, err := DB.Exec(
 		"INSERT INTO drafts (chapter_id, content) VALUES (?, ?)",
-		chapterID, input.Content,
+		chapterID, sanitizeHTML(input.Content),
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, "createDraft insert", err)
 		return
 	}
 
-	id, _ := result.LastInsertId()
-	var d Draft
-	DB.QueryRow("SELECT id, chapter_id, saved_at FROM drafts WHERE id=?", id).
-		Scan(&d.ID, &d.ChapterID, &d.SavedAt)
+	id, err := result.LastInsertId()
+	if err != nil {
+		serverError(w, "createDraft last insert id", err)
+		return
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(d)
+	var d Draft
+	if err := DB.QueryRow("SELECT id, chapter_id, saved_at FROM drafts WHERE id=?", id).
+		Scan(&d.ID, &d.ChapterID, &d.SavedAt); err != nil {
+		serverError(w, "createDraft reload", err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, d)
 }
 
-// POST /api/v1/drafts/:id/restore
+// POST /api/v1/drafts/{id}/restore
 func restoreDraft(w http.ResponseWriter, r *http.Request) {
-	draftID := mux.Vars(r)["id"]
+	draftID, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	author := authorID(r)
 
-	var d Draft
-	err := DB.QueryRow(
-		"SELECT id, chapter_id, COALESCE(content,''), saved_at FROM drafts WHERE id=?", draftID,
-	).Scan(&d.ID, &d.ChapterID, &d.Content, &d.SavedAt)
+	// 還原與刪除必須同進退，否則章節更新成功但草稿沒刪會造成重複還原。
+	tx, err := DB.Begin()
 	if err != nil {
-		http.Error(w, "Draft not found", http.StatusNotFound)
+		serverError(w, "restoreDraft begin", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// 讀取時就沿著 drafts → chapters → novels 驗證擁有權，
+	// 不屬於目前作者的草稿與不存在的草稿回應完全相同，不洩漏其存在。
+	var d Draft
+	err = tx.QueryRow(
+		`SELECT d.id, d.chapter_id, COALESCE(d.content,''), d.saved_at
+		 FROM drafts d
+		 JOIN chapters c ON d.chapter_id = c.id
+		 JOIN novels n ON c.novel_id = n.id
+		 WHERE d.id = ? AND n.author_id = ?`, draftID, author,
+	).Scan(&d.ID, &d.ChapterID, &d.Content, &d.SavedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "找不到這份草稿。")
+		return
+	}
+	if err != nil {
+		serverError(w, "restoreDraft load", err)
 		return
 	}
 
-	// 回復：更新 chapter 內容
-	wc := countWords(d.Content)
-	DB.Exec(
+	if _, err := tx.Exec(
 		"UPDATE chapters SET content=?, word_count=?, updated_at=NOW() WHERE id=?",
-		d.Content, wc, d.ChapterID,
-	)
+		d.Content, countWords(d.Content), d.ChapterID,
+	); err != nil {
+		serverError(w, "restoreDraft update chapter", err)
+		return
+	}
 
-	// 刪除已回復的草稿
-	DB.Exec("DELETE FROM drafts WHERE id=?", draftID)
+	if _, err := tx.Exec("DELETE FROM drafts WHERE id=?", draftID); err != nil {
+		serverError(w, "restoreDraft delete", err)
+		return
+	}
 
-	// 回傳完整 content 給前端
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(d)
+	if err := tx.Commit(); err != nil {
+		serverError(w, "restoreDraft commit", err)
+		return
+	}
+
+	d.Preview = draftPreview(d.Content)
+	writeJSON(w, http.StatusOK, d)
 }

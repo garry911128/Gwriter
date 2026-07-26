@@ -1,0 +1,63 @@
+-- GWriter 初始 schema
+-- 資料庫本身由 docker-compose 的 MYSQL_DATABASE 環境變數建立
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS novels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    author_id INT NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    cover_url VARCHAR(500),
+    status ENUM('draft', 'published') DEFAULT 'draft',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (author_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS chapters (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    novel_id INT NOT NULL,
+    title VARCHAR(500) NOT NULL DEFAULT '',
+    content LONGTEXT,
+    chapter_order INT NOT NULL DEFAULT 0,
+    word_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (novel_id) REFERENCES novels(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS characters (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    novel_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    role VARCHAR(100),
+    avatar_url VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (novel_id) REFERENCES novels(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS world_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    novel_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    category VARCHAR(50) NOT NULL DEFAULT 'location',
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (novel_id) REFERENCES novels(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS drafts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    chapter_id INT NOT NULL,
+    content LONGTEXT,
+    saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

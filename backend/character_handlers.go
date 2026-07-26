@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
-
-	"github.com/gorilla/mux"
+	"strings"
 )
 
 const charSelectCols = `id, novel_id, name, COALESCE(role,''), COALESCE(description,''), COALESCE(personality,''), COALESCE(background,''), COALESCE(avatar_url,'')`
@@ -15,16 +13,39 @@ func scanCharacter(row interface{ Scan(...any) error }) (Character, error) {
 	return c, err
 }
 
-// GET /api/v1/novels/:novelId/characters
+type characterInput struct {
+	Name        string `json:"name"`
+	Role        string `json:"role"`
+	Description string `json:"description"`
+	Personality string `json:"personality"`
+	Background  string `json:"background"`
+	AvatarURL   string `json:"avatar_url"`
+}
+
+// validate 回傳非空字串代表輸入不合法。
+func (in characterInput) validate() string {
+	if strings.TrimSpace(in.Name) == "" {
+		return "角色名稱不可為空。"
+	}
+	return validateCoverURL(in.AvatarURL)
+}
+
+// GET /api/v1/novels/{novelId}/characters
 func getCharacters(w http.ResponseWriter, r *http.Request) {
-	novelID := mux.Vars(r)["novelId"]
+	novelID, ok := pathID(w, r, "novelId")
+	if !ok {
+		return
+	}
+	if !ensureOwnsNovel(w, novelID, authorID(r)) {
+		return
+	}
 
 	rows, err := DB.Query(
 		`SELECT `+charSelectCols+` FROM characters WHERE novel_id = ? ORDER BY id ASC`,
 		novelID,
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, "getCharacters query", err)
 		return
 	}
 	defer rows.Close()
@@ -33,78 +54,120 @@ func getCharacters(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		c, err := scanCharacter(rows)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serverError(w, "getCharacters scan", err)
 			return
 		}
 		chars = append(chars, c)
 	}
+	if err := rows.Err(); err != nil {
+		serverError(w, "getCharacters rows", err)
+		return
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(chars)
+	writeJSON(w, http.StatusOK, chars)
 }
 
-// POST /api/v1/novels/:novelId/characters
+// POST /api/v1/novels/{novelId}/characters
 func createCharacter(w http.ResponseWriter, r *http.Request) {
-	novelID := mux.Vars(r)["novelId"]
-
-	var input struct {
-		Name        string `json:"name"`
-		Role        string `json:"role"`
-		Description string `json:"description"`
-		Personality string `json:"personality"`
-		Background  string `json:"background"`
+	novelID, ok := pathID(w, r, "novelId")
+	if !ok {
+		return
 	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if !ensureOwnsNovel(w, novelID, authorID(r)) {
+		return
+	}
+
+	var input characterInput
+	if !decodeJSON(w, r, maxSmallBody, &input) {
+		return
+	}
+	if msg := input.validate(); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
 		return
 	}
 
 	result, err := DB.Exec(
-		"INSERT INTO characters (novel_id, name, role, description, personality, background) VALUES (?, ?, ?, ?, ?, ?)",
-		novelID, input.Name, input.Role, input.Description, input.Personality, input.Background,
+		"INSERT INTO characters (novel_id, name, role, description, personality, background, avatar_url)"+
+			" VALUES (?, ?, ?, ?, ?, ?, ?)",
+		novelID, input.Name, input.Role, input.Description, input.Personality, input.Background, input.AvatarURL,
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serverError(w, "createCharacter insert", err)
 		return
 	}
 
-	id, _ := result.LastInsertId()
-	c, _ := scanCharacter(DB.QueryRow(`SELECT `+charSelectCols+` FROM characters WHERE id = ?`, id))
+	id, err := result.LastInsertId()
+	if err != nil {
+		serverError(w, "createCharacter last insert id", err)
+		return
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(c)
+	c, err := scanCharacter(DB.QueryRow(`SELECT `+charSelectCols+` FROM characters WHERE id = ?`, id))
+	if err != nil {
+		serverError(w, "createCharacter reload", err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, c)
 }
 
-// PUT /api/v1/characters/:id
+// PUT /api/v1/characters/{id}
 func updateCharacter(w http.ResponseWriter, r *http.Request) {
-	charID := mux.Vars(r)["id"]
-
-	var input struct {
-		Name        string `json:"name"`
-		Role        string `json:"role"`
-		Description string `json:"description"`
-		Personality string `json:"personality"`
-		Background  string `json:"background"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	charID, ok := pathID(w, r, "id")
+	if !ok {
 		return
 	}
 
-	DB.Exec(
-		"UPDATE characters SET name=?, role=?, description=?, personality=?, background=? WHERE id=?",
-		input.Name, input.Role, input.Description, input.Personality, input.Background, charID,
-	)
+	var input characterInput
+	if !decodeJSON(w, r, maxSmallBody, &input) {
+		return
+	}
+	if msg := input.validate(); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
 
-	c, _ := scanCharacter(DB.QueryRow(`SELECT `+charSelectCols+` FROM characters WHERE id = ?`, charID))
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(c)
+	res, err := DB.Exec(
+		"UPDATE characters SET name=?, role=?, description=?, personality=?, background=?, avatar_url=?"+
+			" WHERE id=? AND "+ownedNovelScope,
+		input.Name, input.Role, input.Description, input.Personality, input.Background, input.AvatarURL,
+		charID, authorID(r),
+	)
+	if err != nil {
+		serverError(w, "updateCharacter", err)
+		return
+	}
+	if !affectedOrNotFound(w, res, "updateCharacter rows affected", "找不到這個角色。") {
+		return
+	}
+
+	c, err := scanCharacter(DB.QueryRow(`SELECT `+charSelectCols+` FROM characters WHERE id = ?`, charID))
+	if err != nil {
+		serverError(w, "updateCharacter reload", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, c)
 }
 
-// DELETE /api/v1/characters/:id
+// DELETE /api/v1/characters/{id}
 func deleteCharacter(w http.ResponseWriter, r *http.Request) {
-	charID := mux.Vars(r)["id"]
-	DB.Exec("DELETE FROM characters WHERE id=?", charID)
+	charID, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+
+	res, err := DB.Exec(
+		"DELETE FROM characters WHERE id=? AND "+ownedNovelScope,
+		charID, authorID(r),
+	)
+	if err != nil {
+		serverError(w, "deleteCharacter", err)
+		return
+	}
+	if !affectedOrNotFound(w, res, "deleteCharacter rows affected", "找不到這個角色。") {
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }

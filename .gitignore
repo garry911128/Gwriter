@@ -14,12 +14,18 @@
 *.swo
 
 # Node.js 前端忽略項目
+# 注意：package-lock.json 刻意「不」忽略 —— frontend/Dockerfile 用 npm ci，需要它才能建置
 /frontend/node_modules/
-/frontend/package-lock.json
 /frontend/yarn.lock
 /frontend/.pnp
 /frontend/.pnp.js
 /frontend/build/
+/frontend/dist/
+/frontend/*.tsbuildinfo
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/
+/frontend/.playwright/
 
 # 日誌和運行時數據
 /npm-debug.log*

@@ -17,8 +17,7 @@ vendor/
 .git
 .gitignore
 
-# 忽略測試文件
-*_test.go
+# 忽略測試輔助目錄（*_test.go 不再排除，CI 需要它們）
 test/
 
 # 忽略編輯器暫存文件

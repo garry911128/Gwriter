@@ -1,0 +1,27 @@
+version: "2"
+
+run:
+  timeout: 5m
+  build-tags:
+    - integration
+
+linters:
+  enable:
+    - errcheck # 這個 repo 原本最嚴重的問題就是丟棄 error，這條必開
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+    - misspell
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt

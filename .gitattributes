@@ -1,0 +1,10 @@
+# 統一以 LF 存放並簽出，避免 Windows 開發 + Linux CI 之間
+# Prettier / gofmt 的換行檢查互相打架。
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
+*.ttf binary
+*.pdf binary
