@@ -259,6 +259,17 @@ fn save_outline_node(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn convert_outline_node_to_chapter(
+    work_id: String,
+    node_id: String,
+    repository: tauri::State<'_, OutlineRepository>,
+) -> Result<OutlineNode, String> {
+    repository
+        .convert_to_chapter(&work_id, &node_id)
+        .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -303,7 +314,8 @@ pub fn run() {
             save_relationship_graph_node,
             remove_relationship_graph_node,
             list_outline_nodes,
-            save_outline_node
+            save_outline_node,
+            convert_outline_node_to_chapter
         ])
         .run(tauri::generate_context!())
         .expect("GWriter failed to start");

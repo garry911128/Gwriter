@@ -28,6 +28,7 @@ export interface LibraryGateway {
   removeRelationshipGraphNode(workId: string, graphId: string, cardId: string): Promise<void>;
   listOutlineNodes(workId: string): Promise<OutlineNode[]>;
   saveOutlineNode(input: SaveOutlineNodeInput): Promise<OutlineNode>;
+  convertOutlineNodeToChapter(workId: string, nodeId: string): Promise<OutlineNode>;
 }
 
 export class TauriLibraryGateway implements LibraryGateway {
@@ -55,6 +56,7 @@ export class TauriLibraryGateway implements LibraryGateway {
   removeRelationshipGraphNode(workId: string, graphId: string, cardId: string) { return invoke<void>("remove_relationship_graph_node", { workId, graphId, cardId }); }
   listOutlineNodes(workId: string) { return invoke<OutlineNode[]>("list_outline_nodes", { workId }); }
   saveOutlineNode(input: SaveOutlineNodeInput) { return invoke<OutlineNode>("save_outline_node", { input }); }
+  convertOutlineNodeToChapter(workId: string, nodeId: string) { return invoke<OutlineNode>("convert_outline_node_to_chapter", { workId, nodeId }); }
 }
 
 export class MemoryLibraryGateway implements LibraryGateway {
@@ -221,6 +223,15 @@ export class MemoryLibraryGateway implements LibraryGateway {
     if (input.parentId && !collection.some((node) => node.id === input.parentId)) throw new Error("找不到父節點");
     const node: OutlineNode = { id: existing?.id ?? crypto.randomUUID(), workId: input.workId, parentId: input.parentId, nodeType: input.nodeType, title: input.title.trim(), summary: input.summary?.trim() ?? "", purpose: input.purpose?.trim() ?? "", conflict: input.conflict?.trim() ?? "", outcome: input.outcome?.trim() ?? "", status: input.status, notes: input.notes?.trim() ?? "", boundEntityKind: existing?.boundEntityKind, boundEntityId: existing?.boundEntityId, sortOrder: existing?.sortOrder ?? collection.filter((item) => item.parentId === input.parentId).length, createdAt: existing?.createdAt ?? now, updatedAt: now };
     if (existing) collection.splice(collection.indexOf(existing),1,node); else collection.push(node); return structuredClone(node);
+  }
+  async convertOutlineNodeToChapter(workId: string, nodeId: string) {
+    const node = this.outlineNodes.get(workId)?.find((item) => item.id === nodeId); const work = this.works.find((item) => item.id === workId);
+    if (!node || !work || node.boundEntityId || node.nodeType === "volume") throw new Error("無法轉換大綱節點");
+    const chapterId = crypto.randomUUID(), now = new Date().toISOString();
+    work.chapters.push({ id: chapterId, workId, title: node.title, sortOrder: work.chapters.length, wordCount: 0 }); work.updatedAt = now;
+    this.documents.set(chapterId, { chapterId, schemaVersion: 1, text: "", savedAt: now }); this.versions.set(chapterId, []);
+    const updated: OutlineNode = { ...node, nodeType: "chapter", boundEntityKind: "chapter", boundEntityId: chapterId, updatedAt: now };
+    this.outlineNodes.get(workId)!.splice(this.outlineNodes.get(workId)!.indexOf(node), 1, updated); return structuredClone(updated);
   }
 }
 

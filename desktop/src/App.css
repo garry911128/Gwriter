@@ -141,8 +141,10 @@ kbd { padding: 2px 5px; border: 1px solid var(--border); border-radius: 4px; bac
 .outline-form input, .outline-form select, .outline-form textarea { min-height: 38px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
 .outline-form textarea { min-height: 68px; resize: vertical; } .outline-form .field-wide { grid-column: 1 / -1; }
 .outline-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.outline-list li > button { width: 100%; display: grid; gap: 4px; padding: 15px 17px; border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; background: var(--surface); cursor: pointer; text-align: left; }
-.outline-list li > button:hover { background: #fffdf8; } .outline-list strong { font: 600 17px Georgia, "Noto Serif TC", serif; } .outline-list small { color: var(--text-muted); }
+.outline-node { display: grid; grid-template-columns: 1fr auto; align-items: center; border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; background: var(--surface); }
+.outline-node-main { display: grid; gap: 4px; padding: 15px 17px; border: 0; background: transparent; cursor: pointer; text-align: left; }
+.outline-node:hover { background: #fffdf8; } .outline-list strong { font: 600 17px Georgia, "Noto Serif TC", serif; } .outline-list small { color: var(--text-muted); }
+.outline-node .outline-convert { width: auto; margin-right: 12px; white-space: nowrap; }
 .outline-list p { margin: 5px 0 0; color: var(--text-muted); font-size: 12px; } .outline-type { color: var(--accent); font-size: 10px; font-weight: 800; }
 @media (max-width: 1050px) { .workspace { grid-template-columns: 56px 250px minmax(420px, 1fr); } .inspector { display: none; } }
 @media (max-width: 760px) { .workspace { grid-template-columns: 56px minmax(0, 1fr); } .navigator { display: none; } .topbar { grid-template-columns: 1fr auto; } .topbar > .button { display: none; } .editor-wrap { padding: 14px; } .relationship-form { grid-template-columns: 1fr; } .relationship-description, .relationship-form .secret-toggle { grid-column: auto; } }

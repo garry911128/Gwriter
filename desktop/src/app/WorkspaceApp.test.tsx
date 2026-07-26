@@ -76,5 +76,10 @@ describe("WorkspaceApp", () => {
     await user.click(screen.getByRole("button", { name: "大綱" })); await user.click(await screen.findByRole("button", { name: "建立第一個規劃節點" }));
     await user.type(screen.getByLabelText(/標題/), "主角發現密室"); await user.type(screen.getByLabelText("目的"), "揭露第一條線索"); await user.click(screen.getByRole("button", { name: "建立節點" }));
     expect(await screen.findByText("主角發現密室")).toBeVisible(); expect(screen.getByText(/尚未綁定/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "轉成章節" }));
+    expect(await screen.findByText(/已綁定正文/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "作品" }));
+    await user.click(screen.getByRole("button", { name: /主角發現密室/ }));
+    expect(await screen.findByRole("heading", { name: "主角發現密室" })).toBeVisible();
   });
 });

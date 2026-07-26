@@ -1,6 +1,7 @@
 use crate::domain::{OutlineNode, SaveOutlineNodeInput};
 use chrono::{SecondsFormat, Utc};
 use rusqlite::{params, Connection};
+use serde_json::json;
 use std::sync::Mutex;
 use thiserror::Error;
 use uuid::Uuid;
@@ -96,6 +97,39 @@ impl OutlineRepository {
         transaction.commit()?;
         Ok(node)
     }
+
+    pub fn convert_to_chapter(
+        &self,
+        work_id: &str,
+        node_id: &str,
+    ) -> Result<OutlineNode, OutlineError> {
+        let chapter_id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        let content =
+            json!({"type":"doc","schemaVersion":1,"content":[{"type":"paragraph","content":[]}]})
+                .to_string();
+        let mut connection = self.connection.lock().expect("outline mutex poisoned");
+        let transaction = connection.transaction()?;
+        let (title, bound_id, node_type): (String, Option<String>, String) = transaction.query_row("SELECT title,bound_entity_id,node_type FROM outline_nodes WHERE id=?1 AND work_id=?2 AND deleted_at IS NULL", params![node_id,work_id], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?))).map_err(|error| match error { rusqlite::Error::QueryReturnedNoRows => OutlineError::NotFound, other => OutlineError::Database(other) })?;
+        if bound_id.is_some() || node_type == "volume" {
+            return Err(OutlineError::InvalidState);
+        }
+        let next_order: i64 = transaction.query_row(
+            "SELECT COALESCE(MAX(sort_order),-1)+1 FROM chapters WHERE work_id=?1",
+            [work_id],
+            |row| row.get(0),
+        )?;
+        transaction.execute("INSERT INTO chapters (id,work_id,title,sort_order,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?5)", params![chapter_id,work_id,title,next_order,now])?;
+        transaction.execute("INSERT INTO documents (chapter_id,schema_version,content_json,plain_text,saved_at) VALUES (?1,1,?2,'',?3)", params![chapter_id,content,now])?;
+        transaction.execute("UPDATE outline_nodes SET node_type='chapter',bound_entity_kind='chapter',bound_entity_id=?1,updated_at=?2 WHERE id=?3", params![chapter_id,now,node_id])?;
+        transaction.execute(
+            "UPDATE works SET updated_at=?1 WHERE id=?2",
+            params![now, work_id],
+        )?;
+        let node = transaction.query_row("SELECT id, work_id, parent_id, node_type, title, summary, purpose, conflict, outcome, status, notes, bound_entity_kind, bound_entity_id, sort_order, created_at, updated_at FROM outline_nodes WHERE id=?1", [node_id], map_node)?;
+        transaction.commit()?;
+        Ok(node)
+    }
 }
 
 fn map_node(row: &rusqlite::Row<'_>) -> Result<OutlineNode, rusqlite::Error> {
@@ -149,5 +183,36 @@ mod tests {
             .unwrap();
         assert!(node.bound_entity_id.is_none());
         assert_eq!(outlines.list_nodes(&work.id).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn conversion_atomically_creates_a_chapter_and_binds_the_node() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("workspace.sqlite3");
+        let library = LibraryRepository::open(&path).unwrap();
+        crate::cards::CardRepository::open(&path).unwrap();
+        crate::graphs::GraphRepository::open(&path).unwrap();
+        let outlines = OutlineRepository::open(&path).unwrap();
+        let work = library.create_work(None).unwrap();
+        let node = outlines
+            .save_node(SaveOutlineNodeInput {
+                id: None,
+                work_id: work.id.clone(),
+                parent_id: None,
+                node_type: "planning".into(),
+                title: "密室".into(),
+                summary: String::new(),
+                purpose: String::new(),
+                conflict: String::new(),
+                outcome: String::new(),
+                status: "planned".into(),
+                notes: String::new(),
+            })
+            .unwrap();
+        let bound = outlines.convert_to_chapter(&work.id, &node.id).unwrap();
+        assert_eq!(bound.bound_entity_kind.as_deref(), Some("chapter"));
+        let refreshed = library.list_works().unwrap();
+        assert_eq!(refreshed[0].chapters.len(), 2);
+        assert_eq!(refreshed[0].chapters[1].title, "密室");
     }
 }

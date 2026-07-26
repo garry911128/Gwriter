@@ -77,6 +77,11 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
     } catch { setError("無法建立作品。請確認工作區可寫入後再試。"); }
   }
 
+  async function refreshStructure() {
+    const refreshed = await gateway.listWorks();
+    setWorks(refreshed);
+  }
+
   function selectWork(work: WorkSummary) {
     setActiveWorkId(work.id);
     setActiveChapterId(work.chapters[0]?.id);
@@ -124,7 +129,7 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
         </section>)}</div>
         {!works.length && <div className="empty-state"><div className="empty-glyph" aria-hidden="true">✦</div><h2>開始第一部作品</h2><p>不必先設定人物或場景，建立後就能直接寫作。</p><button className="button button--primary" onClick={createWork}>建立作品</button></div>}
       </aside>
-      {activeTool === "cards" ? <CardWorkspace workId={activeWorkId} gateway={gateway} onError={setError} /> : activeTool === "graph" ? <GraphWorkspace workId={activeWorkId} gateway={gateway} onError={setError} /> : activeTool === "outline" ? <OutlineWorkspace workId={activeWorkId} gateway={gateway} onError={setError} /> : <main className="editor-pane">
+      {activeTool === "cards" ? <CardWorkspace workId={activeWorkId} gateway={gateway} onError={setError} /> : activeTool === "graph" ? <GraphWorkspace workId={activeWorkId} gateway={gateway} onError={setError} /> : activeTool === "outline" ? <OutlineWorkspace workId={activeWorkId} gateway={gateway} onError={setError} onStructureChanged={refreshStructure} /> : <main className="editor-pane">
         {activeChapter ? <>
           <div className="document-header"><div><span className="breadcrumbs">{activeWork?.title} ／ 正文</span><h2>{activeChapter.title}</h2></div><div className="document-actions"><button className="button button--quiet" onClick={openVersions}>版本</button><button className="button button--accent">AI 建議</button></div></div>
           <div className="editor-wrap">
