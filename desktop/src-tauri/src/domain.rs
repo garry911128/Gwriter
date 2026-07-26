@@ -234,6 +234,16 @@ pub struct LocalBackupInfo {
     pub format_version: i64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortableBackupInfo {
+    pub path: String,
+    pub size_bytes: u64,
+    pub created_at: String,
+    pub format_version: i64,
+    pub database_sha256: String,
+}
+
 fn empty_object() -> serde_json::Value {
     serde_json::json!({})
 }

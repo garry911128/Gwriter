@@ -9,8 +9,8 @@ use backup::BackupService;
 use cards::CardRepository;
 use domain::{
     Card, CardRelationship, CardType, ChapterDocument, DocumentVersionSummary, LocalBackupInfo,
-    OutlineNode, RecoveryDraft, RelationshipGraph, RelationshipGraphNode, SaveCardInput,
-    SaveCardRelationshipInput, SaveOutlineNodeInput, SaveRelationshipGraphInput,
+    OutlineNode, PortableBackupInfo, RecoveryDraft, RelationshipGraph, RelationshipGraphNode,
+    SaveCardInput, SaveCardRelationshipInput, SaveOutlineNodeInput, SaveRelationshipGraphInput,
     SaveRelationshipGraphNodeInput, WorkSummary, WorkspaceStorageInfo,
 };
 use graphs::GraphRepository;
@@ -288,6 +288,15 @@ fn list_local_backups(
 ) -> Result<Vec<LocalBackupInfo>, String> {
     service.list_backups().map_err(|error| error.to_string())
 }
+#[tauri::command]
+fn export_portable_backup(
+    destination: String,
+    service: tauri::State<'_, BackupService>,
+) -> Result<PortableBackupInfo, String> {
+    service
+        .export_portable_backup(std::path::Path::new(&destination))
+        .map_err(|error| error.to_string())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -342,7 +351,8 @@ pub fn run() {
             convert_outline_node_to_chapter,
             get_workspace_storage_info,
             create_local_backup,
-            list_local_backups
+            list_local_backups,
+            export_portable_backup
         ])
         .run(tauri::generate_context!())
         .expect("GWriter failed to start");

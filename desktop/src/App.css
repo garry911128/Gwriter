@@ -155,6 +155,8 @@ kbd { padding: 2px 5px; border: 1px solid var(--border); border-radius: 4px; bac
 .backup-notice { margin: 8px 0 14px; padding: 10px 12px; border-radius: 7px; color: #715524; background: #fff2d4; font-size: 11px; }
 .backup-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; } .backup-list li { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; }
 .backup-list span, .backup-list small { color: var(--text-muted); font-size: 10px; } .backup-list small { grid-column: 1 / -1; font-family: Consolas, monospace; }
+.portable-result { display: grid; gap: 5px; padding: 13px; border: 1px solid #9bbca4; border-radius: 8px; background: #eef8f0; }
+.portable-result span, .portable-result small, .portable-result code { overflow-wrap: anywhere; color: var(--text-muted); font-size: 10px; }
 @media (max-width: 1050px) { .workspace { grid-template-columns: 56px 250px minmax(420px, 1fr); } .inspector { display: none; } }
 @media (max-width: 760px) { .workspace { grid-template-columns: 56px minmax(0, 1fr); } .navigator { display: none; } .topbar { grid-template-columns: 1fr auto; } .topbar > .button { display: none; } .editor-wrap { padding: 14px; } .relationship-form { grid-template-columns: 1fr; } .relationship-description, .relationship-form .secret-toggle { grid-column: auto; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }

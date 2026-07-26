@@ -3,7 +3,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary } from "../../entities/library";
 import type { Card, CardRelationship, CardType, RelationshipGraph, RelationshipGraphNode, SaveCardInput, SaveCardRelationshipInput, SaveRelationshipGraphInput, SaveRelationshipGraphNodeInput } from "../../entities/cards";
 import type { OutlineNode, SaveOutlineNodeInput } from "../../entities/outline";
-import type { LocalBackupInfo, WorkspaceStorageInfo } from "../../entities/settings";
+import type { LocalBackupInfo, PortableBackupInfo, WorkspaceStorageInfo } from "../../entities/settings";
 
 export interface LibraryGateway {
   listWorks(): Promise<WorkSummary[]>;
@@ -35,6 +35,7 @@ export interface LibraryGateway {
   createLocalBackup(): Promise<LocalBackupInfo>;
   listLocalBackups(): Promise<LocalBackupInfo[]>;
   openWorkspaceDataDirectory(): Promise<void>;
+  exportPortableBackup(destination: string): Promise<PortableBackupInfo>;
 }
 
 export class TauriLibraryGateway implements LibraryGateway {
@@ -67,6 +68,7 @@ export class TauriLibraryGateway implements LibraryGateway {
   createLocalBackup() { return invoke<LocalBackupInfo>("create_local_backup"); }
   listLocalBackups() { return invoke<LocalBackupInfo[]>("list_local_backups"); }
   async openWorkspaceDataDirectory() { const info = await this.getWorkspaceStorageInfo(); await openPath(info.dataDirectory); }
+  exportPortableBackup(destination: string) { return invoke<PortableBackupInfo>("export_portable_backup", { destination }); }
 }
 
 export class MemoryLibraryGateway implements LibraryGateway {
@@ -248,6 +250,7 @@ export class MemoryLibraryGateway implements LibraryGateway {
   async createLocalBackup() { const createdAt=new Date().toISOString(); const backup:LocalBackupInfo={fileName:`gwriter-safety-v1-${Date.now()}.sqlite3`,path:`C:\\Users\\Author\\AppData\\GWriter\\backups\\gwriter-safety-v1-${Date.now()}.sqlite3`,sizeBytes:4096,createdAt,formatVersion:1};this.localBackups.unshift(backup);return structuredClone(backup); }
   async listLocalBackups() { return structuredClone(this.localBackups); }
   async openWorkspaceDataDirectory() {}
+  async exportPortableBackup(destination: string) { return { path:destination,sizeBytes:8192,createdAt:new Date().toISOString(),formatVersion:1,databaseSha256:"a".repeat(64) }; }
 }
 
 export function createLibraryGateway(): LibraryGateway {

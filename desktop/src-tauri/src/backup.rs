@@ -1,11 +1,14 @@
-use crate::domain::{LocalBackupInfo, WorkspaceStorageInfo};
+use crate::domain::{LocalBackupInfo, PortableBackupInfo, WorkspaceStorageInfo};
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use rusqlite::{Connection, DatabaseName};
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 use thiserror::Error;
+use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 const BACKUP_FORMAT_VERSION: i64 = 1;
 
@@ -17,12 +20,28 @@ pub enum BackupError {
     Database(#[from] rusqlite::Error),
     #[error("備份完整性檢查失敗")]
     Integrity,
+    #[error("無法建立可攜備份包")]
+    Archive(#[from] zip::result::ZipError),
+    #[error("備份 manifest 無法序列化")]
+    Manifest(#[from] serde_json::Error),
 }
 
 pub struct BackupService {
     data_directory: PathBuf,
     database_path: PathBuf,
     backup_directory: PathBuf,
+}
+
+#[derive(Serialize)]
+struct PortableManifest<'a> {
+    format: &'a str,
+    format_version: i64,
+    created_at: &'a str,
+    app_version: &'a str,
+    schema_version: i64,
+    database_path: &'a str,
+    database_sha256: &'a str,
+    assets: Vec<String>,
 }
 impl BackupService {
     pub fn new(data_directory: PathBuf) -> Self {
@@ -73,6 +92,79 @@ impl BackupService {
         } else {
             self.create_backup().map(Some)
         }
+    }
+    pub fn export_portable_backup(
+        &self,
+        destination: &Path,
+    ) -> Result<PortableBackupInfo, BackupError> {
+        let parent = destination.parent().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "missing destination directory",
+            )
+        })?;
+        fs::create_dir_all(parent)?;
+        let token = uuid::Uuid::new_v4();
+        let snapshot_path = self
+            .backup_directory
+            .join(format!("export-{token}.sqlite3"));
+        fs::create_dir_all(&self.backup_directory)?;
+        let source = Connection::open(&self.database_path)?;
+        source.backup(DatabaseName::Main, &snapshot_path, None)?;
+        let snapshot = Connection::open(&snapshot_path)?;
+        let check: String = snapshot.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+        let schema_version: i64 =
+            snapshot.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        drop(snapshot);
+        if check != "ok" {
+            let _ = fs::remove_file(&snapshot_path);
+            return Err(BackupError::Integrity);
+        }
+        let database_bytes = fs::read(&snapshot_path)?;
+        let database_sha256 = Sha256::digest(&database_bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let created_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        let manifest = PortableManifest {
+            format: "gwriter-workspace-backup",
+            format_version: BACKUP_FORMAT_VERSION,
+            created_at: &created_at,
+            app_version: env!("CARGO_PKG_VERSION"),
+            schema_version,
+            database_path: "workspace/workspace.sqlite3",
+            database_sha256: &database_sha256,
+            assets: vec![],
+        };
+        let partial = parent.join(format!(".gwriter-export-{token}.partial"));
+        let result = (|| -> Result<(), BackupError> {
+            let file = fs::File::create(&partial)?;
+            let mut archive = ZipWriter::new(file);
+            let options =
+                SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+            archive.start_file("manifest.json", options)?;
+            std::io::Write::write_all(&mut archive, &serde_json::to_vec_pretty(&manifest)?)?;
+            archive.start_file("workspace/workspace.sqlite3", options)?;
+            std::io::Write::write_all(&mut archive, &database_bytes)?;
+            archive.finish()?;
+            if destination.exists() {
+                fs::remove_file(destination)?;
+            }
+            fs::rename(&partial, destination)?;
+            Ok(())
+        })();
+        let _ = fs::remove_file(&snapshot_path);
+        if result.is_err() {
+            let _ = fs::remove_file(&partial);
+        }
+        result?;
+        Ok(PortableBackupInfo {
+            path: destination.display().to_string(),
+            size_bytes: fs::metadata(destination)?.len(),
+            created_at,
+            format_version: BACKUP_FORMAT_VERSION,
+            database_sha256,
+        })
     }
     pub fn list_backups(&self) -> Result<Vec<LocalBackupInfo>, BackupError> {
         if !self.backup_directory.exists() {
@@ -128,6 +220,7 @@ impl BackupService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Read;
     #[test]
     fn creates_a_consistent_versioned_local_snapshot() {
         let directory = tempfile::tempdir().unwrap();
@@ -149,5 +242,30 @@ mod tests {
             "稿件"
         );
         assert!(service.ensure_daily_backup().unwrap().is_none());
+    }
+
+    #[test]
+    fn portable_package_contains_a_versioned_manifest_and_verified_database() {
+        let directory = tempfile::tempdir().unwrap();
+        let db = directory.path().join("workspace.sqlite3");
+        let connection = Connection::open(&db).unwrap();
+        connection.execute_batch("PRAGMA user_version=6; CREATE TABLE sample(value TEXT); INSERT INTO sample VALUES ('正文');").unwrap();
+        drop(connection);
+        let service = BackupService::new(directory.path().to_path_buf());
+        let destination = directory.path().join("author.gwriter-backup");
+        let result = service.export_portable_backup(&destination).unwrap();
+        assert_eq!(result.database_sha256.len(), 64);
+        let mut archive = zip::ZipArchive::new(fs::File::open(destination).unwrap()).unwrap();
+        let mut manifest = String::new();
+        archive
+            .by_name("manifest.json")
+            .unwrap()
+            .read_to_string(&mut manifest)
+            .unwrap();
+        let manifest: serde_json::Value = serde_json::from_str(&manifest).unwrap();
+        assert_eq!(manifest["format_version"], 1);
+        assert_eq!(manifest["schema_version"], 6);
+        assert_eq!(manifest["database_sha256"], result.database_sha256);
+        assert!(archive.by_name("workspace/workspace.sqlite3").is_ok());
     }
 }
