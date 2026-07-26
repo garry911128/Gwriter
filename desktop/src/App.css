@@ -146,6 +146,15 @@ kbd { padding: 2px 5px; border: 1px solid var(--border); border-radius: 4px; bac
 .outline-node:hover { background: #fffdf8; } .outline-list strong { font: 600 17px Georgia, "Noto Serif TC", serif; } .outline-list small { color: var(--text-muted); }
 .outline-node .outline-convert { width: auto; margin-right: 12px; white-space: nowrap; }
 .outline-list p { margin: 5px 0 0; color: var(--text-muted); font-size: 12px; } .outline-type { color: var(--accent); font-size: 10px; font-weight: 800; }
+.settings-pane { min-width: 0; overflow: auto; background: #ebe5da; }
+.settings-content { display: grid; gap: 18px; max-width: 880px; margin: 0 auto; padding: 24px; }
+.settings-card { padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.settings-card h3 { margin: 0 0 5px; font: 600 19px Georgia, "Noto Serif TC", serif; } .settings-card > p, .settings-title p { margin: 0 0 14px; color: var(--text-muted); font-size: 12px; }
+.settings-card dl { display: grid; grid-template-columns: 120px 1fr; margin: 16px 0; font-size: 12px; } .settings-card dt, .settings-card dd { padding: 8px; border-bottom: 1px solid var(--border); } .settings-card dt { color: var(--text-muted); } .settings-card dd { margin: 0; overflow-wrap: anywhere; font-family: Consolas, monospace; }
+.settings-card > .button { width: auto; } .settings-title { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
+.backup-notice { margin: 8px 0 14px; padding: 10px 12px; border-radius: 7px; color: #715524; background: #fff2d4; font-size: 11px; }
+.backup-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; } .backup-list li { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; }
+.backup-list span, .backup-list small { color: var(--text-muted); font-size: 10px; } .backup-list small { grid-column: 1 / -1; font-family: Consolas, monospace; }
 @media (max-width: 1050px) { .workspace { grid-template-columns: 56px 250px minmax(420px, 1fr); } .inspector { display: none; } }
 @media (max-width: 760px) { .workspace { grid-template-columns: 56px minmax(0, 1fr); } .navigator { display: none; } .topbar { grid-template-columns: 1fr auto; } .topbar > .button { display: none; } .editor-wrap { padding: 14px; } .relationship-form { grid-template-columns: 1fr; } .relationship-description, .relationship-form .secret-toggle { grid-column: auto; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }

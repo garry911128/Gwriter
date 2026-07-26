@@ -1,15 +1,17 @@
+mod backup;
 mod cards;
 mod domain;
 mod graphs;
 mod library;
 mod outline;
 
+use backup::BackupService;
 use cards::CardRepository;
 use domain::{
-    Card, CardRelationship, CardType, ChapterDocument, DocumentVersionSummary, OutlineNode,
-    RecoveryDraft, RelationshipGraph, RelationshipGraphNode, SaveCardInput,
+    Card, CardRelationship, CardType, ChapterDocument, DocumentVersionSummary, LocalBackupInfo,
+    OutlineNode, RecoveryDraft, RelationshipGraph, RelationshipGraphNode, SaveCardInput,
     SaveCardRelationshipInput, SaveOutlineNodeInput, SaveRelationshipGraphInput,
-    SaveRelationshipGraphNodeInput, WorkSummary,
+    SaveRelationshipGraphNodeInput, WorkSummary, WorkspaceStorageInfo,
 };
 use graphs::GraphRepository;
 use library::LibraryRepository;
@@ -270,6 +272,29 @@ fn convert_outline_node_to_chapter(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn get_workspace_storage_info(service: tauri::State<'_, BackupService>) -> WorkspaceStorageInfo {
+    service.storage_info()
+}
+#[tauri::command]
+fn create_local_backup(
+    service: tauri::State<'_, BackupService>,
+) -> Result<LocalBackupInfo, String> {
+    service.create_backup().map_err(|error| error.to_string())
+}
+#[tauri::command]
+fn list_local_backups(
+    service: tauri::State<'_, BackupService>,
+) -> Result<Vec<LocalBackupInfo>, String> {
+    service.list_backups().map_err(|error| error.to_string())
+}
+#[tauri::command]
+fn open_workspace_data_directory(service: tauri::State<'_, BackupService>) -> Result<(), String> {
+    service
+        .open_data_directory()
+        .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -284,10 +309,13 @@ pub fn run() {
                 .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
             let outline_repository = OutlineRepository::open(&data_dir.join("workspace.sqlite3"))
                 .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
+            let backup_service = BackupService::new(data_dir);
+            let _ = backup_service.ensure_daily_backup();
             app.manage(repository);
             app.manage(card_repository);
             app.manage(graph_repository);
             app.manage(outline_repository);
+            app.manage(backup_service);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -315,7 +343,11 @@ pub fn run() {
             remove_relationship_graph_node,
             list_outline_nodes,
             save_outline_node,
-            convert_outline_node_to_chapter
+            convert_outline_node_to_chapter,
+            get_workspace_storage_info,
+            create_local_backup,
+            list_local_backups,
+            open_workspace_data_directory
         ])
         .run(tauri::generate_context!())
         .expect("GWriter failed to start");

@@ -216,6 +216,24 @@ pub struct SaveOutlineNodeInput {
     pub notes: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceStorageInfo {
+    pub data_directory: String,
+    pub database_path: String,
+    pub backup_directory: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalBackupInfo {
+    pub file_name: String,
+    pub path: String,
+    pub size_bytes: u64,
+    pub created_at: String,
+    pub format_version: i64,
+}
+
 fn empty_object() -> serde_json::Value {
     serde_json::json!({})
 }

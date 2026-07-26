@@ -82,4 +82,13 @@ describe("WorkspaceApp", () => {
     await user.click(screen.getByRole("button", { name: /主角發現密室/ }));
     expect(await screen.findByRole("heading", { name: "主角發現密室" })).toBeVisible();
   });
+
+  it("shows the real local storage location and creates a safety backup", async () => {
+    const user = userEvent.setup(); render(<WorkspaceApp gateway={new MemoryLibraryGateway()} />);
+    await user.click(screen.getByRole("button", { name: "設定" }));
+    expect(await screen.findByText(/workspace\.sqlite3/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "立即備份" }));
+    expect(await screen.findByText(/格式 v1/)).toBeVisible();
+    expect(screen.getByText(/gwriter-safety-v1-/)).toBeVisible();
+  });
 });

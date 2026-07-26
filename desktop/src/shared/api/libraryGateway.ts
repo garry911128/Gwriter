@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary } from "../../entities/library";
 import type { Card, CardRelationship, CardType, RelationshipGraph, RelationshipGraphNode, SaveCardInput, SaveCardRelationshipInput, SaveRelationshipGraphInput, SaveRelationshipGraphNodeInput } from "../../entities/cards";
 import type { OutlineNode, SaveOutlineNodeInput } from "../../entities/outline";
+import type { LocalBackupInfo, WorkspaceStorageInfo } from "../../entities/settings";
 
 export interface LibraryGateway {
   listWorks(): Promise<WorkSummary[]>;
@@ -29,6 +30,10 @@ export interface LibraryGateway {
   listOutlineNodes(workId: string): Promise<OutlineNode[]>;
   saveOutlineNode(input: SaveOutlineNodeInput): Promise<OutlineNode>;
   convertOutlineNodeToChapter(workId: string, nodeId: string): Promise<OutlineNode>;
+  getWorkspaceStorageInfo(): Promise<WorkspaceStorageInfo>;
+  createLocalBackup(): Promise<LocalBackupInfo>;
+  listLocalBackups(): Promise<LocalBackupInfo[]>;
+  openWorkspaceDataDirectory(): Promise<void>;
 }
 
 export class TauriLibraryGateway implements LibraryGateway {
@@ -57,6 +62,10 @@ export class TauriLibraryGateway implements LibraryGateway {
   listOutlineNodes(workId: string) { return invoke<OutlineNode[]>("list_outline_nodes", { workId }); }
   saveOutlineNode(input: SaveOutlineNodeInput) { return invoke<OutlineNode>("save_outline_node", { input }); }
   convertOutlineNodeToChapter(workId: string, nodeId: string) { return invoke<OutlineNode>("convert_outline_node_to_chapter", { workId, nodeId }); }
+  getWorkspaceStorageInfo() { return invoke<WorkspaceStorageInfo>("get_workspace_storage_info"); }
+  createLocalBackup() { return invoke<LocalBackupInfo>("create_local_backup"); }
+  listLocalBackups() { return invoke<LocalBackupInfo[]>("list_local_backups"); }
+  openWorkspaceDataDirectory() { return invoke<void>("open_workspace_data_directory"); }
 }
 
 export class MemoryLibraryGateway implements LibraryGateway {
@@ -70,6 +79,7 @@ export class MemoryLibraryGateway implements LibraryGateway {
   private graphs = new Map<string, RelationshipGraph[]>();
   private graphNodes = new Map<string, RelationshipGraphNode[]>();
   private outlineNodes = new Map<string, OutlineNode[]>();
+  private localBackups: LocalBackupInfo[] = [];
   private readonly cardTypes: CardType[] = [
     { id: "builtin-character", name: "人物", icon: "人", color: "#9c4f32", fieldSchema: [{ key: "aliases", label: "別名與稱謂", type: "long_text" }, { key: "role", label: "故事定位", type: "short_text" }, { key: "motivation", label: "目標與動機", type: "long_text" }, { key: "notes", label: "作者備註", type: "long_text" }], isBuiltin: true },
     { id: "builtin-scene", name: "場景", icon: "景", color: "#526d82", fieldSchema: [], isBuiltin: true },
@@ -233,6 +243,10 @@ export class MemoryLibraryGateway implements LibraryGateway {
     const updated: OutlineNode = { ...node, nodeType: "chapter", boundEntityKind: "chapter", boundEntityId: chapterId, updatedAt: now };
     this.outlineNodes.get(workId)!.splice(this.outlineNodes.get(workId)!.indexOf(node), 1, updated); return structuredClone(updated);
   }
+  async getWorkspaceStorageInfo() { return { dataDirectory:"C:\\Users\\Author\\AppData\\GWriter", databasePath:"C:\\Users\\Author\\AppData\\GWriter\\workspace.sqlite3", backupDirectory:"C:\\Users\\Author\\AppData\\GWriter\\backups" }; }
+  async createLocalBackup() { const createdAt=new Date().toISOString(); const backup:LocalBackupInfo={fileName:`gwriter-safety-v1-${Date.now()}.sqlite3`,path:`C:\\Users\\Author\\AppData\\GWriter\\backups\\gwriter-safety-v1-${Date.now()}.sqlite3`,sizeBytes:4096,createdAt,formatVersion:1};this.localBackups.unshift(backup);return structuredClone(backup); }
+  async listLocalBackups() { return structuredClone(this.localBackups); }
+  async openWorkspaceDataDirectory() {}
 }
 
 export function createLibraryGateway(): LibraryGateway {
