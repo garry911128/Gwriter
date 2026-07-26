@@ -63,6 +63,9 @@ kbd { padding: 2px 5px; border: 1px solid var(--border); border-radius: 4px; bac
 .document-header h2 { margin: 3px 0 0; font: 600 20px Georgia, "Noto Serif TC", serif; }
 .document-actions { display: flex; gap: 6px; }
 .editor-wrap { min-height: 0; overflow: auto; padding: 28px clamp(24px, 7vw, 92px); }
+.recovery-banner { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 0 0 14px; padding: 12px 14px; border: 1px solid #c39245; border-radius: var(--radius); background: #fff8df; box-shadow: var(--shadow); }
+.recovery-banner > div { display: flex; align-items: center; gap: 8px; }
+.recovery-banner strong { font-size: 13px; } .recovery-banner span { color: var(--text-muted); font-size: 11px; }
 .editor-wrap textarea { width: 100%; min-height: 100%; resize: none; padding: 48px clamp(32px, 7vw, 84px); border: 1px solid var(--border); border-radius: 3px; color: #28251f; background: #fffefb; box-shadow: var(--shadow); font: 18px/1.95 Georgia, "Noto Serif TC", "PMingLiU", serif; caret-color: var(--accent); }
 .editor-wrap textarea::placeholder { color: #aaa296; }
 .statusbar { display: flex; justify-content: flex-end; gap: 22px; padding: 8px 18px; color: var(--text-muted); background: var(--surface); border-top: 1px solid var(--border); font-size: 11px; }
@@ -74,6 +77,12 @@ kbd { padding: 2px 5px; border: 1px solid var(--border); border-radius: 4px; bac
 .inspector-section h3 { margin: 0 0 8px; font-size: 13px; }
 .inspector-section p { margin: 0 0 14px; font-size: 12px; }
 .inspector-section textarea { width: 100%; min-height: 120px; resize: vertical; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+.section-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.version-panel ol { display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.version-panel li { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+.version-panel li strong, .version-panel li small { display: block; }
+.version-panel li small { margin-top: 3px; color: var(--text-muted); font-size: 10px; }
+.version-panel li p { overflow: hidden; margin: 8px 0; white-space: nowrap; text-overflow: ellipsis; }
 @media (max-width: 1050px) { .workspace { grid-template-columns: 56px 250px minmax(420px, 1fr); } .inspector { display: none; } }
 @media (max-width: 760px) { .workspace { grid-template-columns: 56px minmax(0, 1fr); } .navigator { display: none; } .topbar { grid-template-columns: 1fr auto; } .topbar > .button { display: none; } .editor-wrap { padding: 14px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }

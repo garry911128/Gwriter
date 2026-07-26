@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChapterDocument, WorkSummary } from "../entities/library";
+import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary } from "../entities/library";
 import { statusLabels } from "../entities/library";
 import type { LibraryGateway } from "../shared/api/libraryGateway";
 
@@ -14,6 +14,9 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
   const [draft, setDraft] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string>();
+  const [recoveryDraft, setRecoveryDraft] = useState<RecoveryDraft>();
+  const [versions, setVersions] = useState<DocumentVersionSummary[]>([]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const saveSequence = useRef(0);
   const activeWork = useMemo(() => works.find((work) => work.id === activeWorkId), [activeWorkId, works]);
   const activeChapter = activeWork?.chapters.find((chapter) => chapter.id === activeChapterId);
@@ -30,11 +33,19 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
     if (!activeChapterId) { setDocument(undefined); setDraft(""); return; }
     let cancelled = false;
     setSaveState("idle");
-    gateway.loadChapter(activeChapterId).then((loaded) => {
-      if (!cancelled) { setDocument(loaded); setDraft(loaded.text); }
+    Promise.all([gateway.loadChapter(activeChapterId), gateway.loadRecovery(activeChapterId)]).then(([loaded, recovery]) => {
+      if (!cancelled) { setDocument(loaded); setDraft(loaded.text); setRecoveryDraft(recovery && recovery.text !== loaded.text ? recovery : undefined); }
     }).catch(() => !cancelled && setError("無法讀取章節內容。"));
     return () => { cancelled = true; };
   }, [activeChapterId, gateway]);
+
+  useEffect(() => {
+    if (!document || draft === document.text) return;
+    const timer = window.setTimeout(() => {
+      gateway.writeRecovery(document.chapterId, draft).catch(() => setError("無法寫入復原日誌；請立即另存內容。"));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [document, draft, gateway]);
 
   useEffect(() => {
     if (!document || draft === document.text) return;
@@ -67,6 +78,29 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
     setActiveChapterId(work.chapters[0]?.id);
   }
 
+  async function openVersions() {
+    if (!activeChapterId) return;
+    try { setVersions(await gateway.listVersions(activeChapterId)); setVersionsOpen(true); }
+    catch { setError("無法讀取版本歷史。"); }
+  }
+
+  async function createVersion() {
+    if (!activeChapterId) return;
+    try { await gateway.createVersion(activeChapterId); setVersions(await gateway.listVersions(activeChapterId)); }
+    catch { setError("無法建立手動版本。"); }
+  }
+
+  async function restoreVersion(versionId: string) {
+    try { const restored = await gateway.restoreVersion(versionId); setDocument(restored); setDraft(restored.text); setVersions(await gateway.listVersions(restored.chapterId)); }
+    catch { setError("版本還原失敗，目前正文沒有變更。"); }
+  }
+
+  async function discardRecovery() {
+    if (!recoveryDraft) return;
+    await gateway.clearRecovery(recoveryDraft.chapterId);
+    setRecoveryDraft(undefined);
+  }
+
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand"><span className="brand-mark" aria-hidden="true">稿</span><div><strong>GWriter</strong><span>隱私優先創作工作台</span></div></div>
@@ -88,8 +122,11 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
       </aside>
       <main className="editor-pane">
         {activeChapter ? <>
-          <div className="document-header"><div><span className="breadcrumbs">{activeWork?.title} ／ 正文</span><h2>{activeChapter.title}</h2></div><div className="document-actions"><button className="button button--quiet">版本</button><button className="button button--accent">AI 建議</button></div></div>
-          <div className="editor-wrap"><textarea aria-label="章節正文" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="從這裡開始寫。人物、場景和大綱都可以稍後再建立……" spellCheck /></div>
+          <div className="document-header"><div><span className="breadcrumbs">{activeWork?.title} ／ 正文</span><h2>{activeChapter.title}</h2></div><div className="document-actions"><button className="button button--quiet" onClick={openVersions}>版本</button><button className="button button--accent">AI 建議</button></div></div>
+          <div className="editor-wrap">
+            {recoveryDraft && <div className="recovery-banner" role="status"><div><strong>找到未完成的編輯</strong><span>{new Date(recoveryDraft.updatedAt).toLocaleString("zh-TW")}</span></div><div><button className="button button--primary" onClick={() => { setDraft(recoveryDraft.text); setRecoveryDraft(undefined); }}>恢復內容</button><button className="button button--quiet" onClick={discardRecovery}>捨棄</button></div></div>}
+            <textarea aria-label="章節正文" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="從這裡開始寫。人物、場景和大綱都可以稍後再建立……" spellCheck />
+          </div>
           <footer className="statusbar"><span>{Array.from(draft.trim()).length} 字元</span><span>本機工作區</span></footer>
         </> : <div className="editor-empty"><span aria-hidden="true">稿</span><h2>你的故事，保留在你的電腦裡</h2><p>從左側建立作品。GWriter 不要求你先填完設定表。</p></div>}
       </main>
@@ -97,6 +134,7 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
         <div className="panel-heading"><div><span className="eyebrow">檢查器</span><h2>章節資訊</h2></div></div>
         <section className="inspector-section"><h3>創作連結</h3><p>人物、場景、地點與劇情線皆為選用。</p><button className="button button--outline" disabled={!activeChapter}>＋ 連結創作卡牌</button></section>
         <section className="inspector-section"><h3>作者備註</h3><textarea aria-label="作者備註" placeholder="不會出現在正式匯出內容中" disabled={!activeChapter} /></section>
+        {versionsOpen && <section className="inspector-section version-panel"><div className="section-title"><h3>版本歷史</h3><button className="icon-button" aria-label="建立手動版本" onClick={createVersion}>＋</button></div>{versions.length ? <ol>{versions.map((version) => <li key={version.id}><div><strong>{version.label || (version.reason === "before_restore" ? "還原前版本" : "手動版本")}</strong><small>{new Date(version.createdAt).toLocaleString("zh-TW")} · {version.characterCount} 字元</small><p>{version.preview || "（空白內容）"}</p></div><button className="button button--outline" onClick={() => restoreVersion(version.id)}>還原</button></li>)}</ol> : <p>尚未建立版本。自動存檔不會塞滿版本歷史。</p>}</section>}
       </aside>
     </div>
   </div>;

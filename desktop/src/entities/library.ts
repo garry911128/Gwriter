@@ -24,6 +24,23 @@ export interface ChapterDocument {
   savedAt: string;
 }
 
+export interface RecoveryDraft {
+  chapterId: string;
+  text: string;
+  updatedAt: string;
+}
+
+export interface DocumentVersionSummary {
+  id: string;
+  chapterId: string;
+  reason: "manual" | "before_restore" | "large_change" | "leaving" | "before_ai" | "before_bulk_replace";
+  label?: string;
+  isImportant: boolean;
+  preview: string;
+  characterCount: number;
+  createdAt: string;
+}
+
 export const statusLabels: Record<WorkStatus, string> = {
   concept: "構思中",
   writing: "撰寫中",

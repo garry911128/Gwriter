@@ -28,3 +28,24 @@ pub struct ChapterDocument {
     pub text: String,
     pub saved_at: String,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentVersionSummary {
+    pub id: String,
+    pub chapter_id: String,
+    pub reason: String,
+    pub label: Option<String>,
+    pub is_important: bool,
+    pub preview: String,
+    pub character_count: i64,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryDraft {
+    pub chapter_id: String,
+    pub text: String,
+    pub updated_at: String,
+}
