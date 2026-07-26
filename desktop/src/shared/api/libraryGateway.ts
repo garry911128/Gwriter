@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary } from "../../entities/library";
 import type { Card, CardRelationship, CardType, RelationshipGraph, RelationshipGraphNode, SaveCardInput, SaveCardRelationshipInput, SaveRelationshipGraphInput, SaveRelationshipGraphNodeInput } from "../../entities/cards";
+import type { OutlineNode, SaveOutlineNodeInput } from "../../entities/outline";
 
 export interface LibraryGateway {
   listWorks(): Promise<WorkSummary[]>;
@@ -25,6 +26,8 @@ export interface LibraryGateway {
   listRelationshipGraphNodes(workId: string, graphId: string): Promise<RelationshipGraphNode[]>;
   saveRelationshipGraphNode(input: SaveRelationshipGraphNodeInput): Promise<RelationshipGraphNode>;
   removeRelationshipGraphNode(workId: string, graphId: string, cardId: string): Promise<void>;
+  listOutlineNodes(workId: string): Promise<OutlineNode[]>;
+  saveOutlineNode(input: SaveOutlineNodeInput): Promise<OutlineNode>;
 }
 
 export class TauriLibraryGateway implements LibraryGateway {
@@ -50,6 +53,8 @@ export class TauriLibraryGateway implements LibraryGateway {
   listRelationshipGraphNodes(workId: string, graphId: string) { return invoke<RelationshipGraphNode[]>("list_relationship_graph_nodes", { workId, graphId }); }
   saveRelationshipGraphNode(input: SaveRelationshipGraphNodeInput) { return invoke<RelationshipGraphNode>("save_relationship_graph_node", { input }); }
   removeRelationshipGraphNode(workId: string, graphId: string, cardId: string) { return invoke<void>("remove_relationship_graph_node", { workId, graphId, cardId }); }
+  listOutlineNodes(workId: string) { return invoke<OutlineNode[]>("list_outline_nodes", { workId }); }
+  saveOutlineNode(input: SaveOutlineNodeInput) { return invoke<OutlineNode>("save_outline_node", { input }); }
 }
 
 export class MemoryLibraryGateway implements LibraryGateway {
@@ -62,6 +67,7 @@ export class MemoryLibraryGateway implements LibraryGateway {
   private relationships = new Map<string, CardRelationship[]>();
   private graphs = new Map<string, RelationshipGraph[]>();
   private graphNodes = new Map<string, RelationshipGraphNode[]>();
+  private outlineNodes = new Map<string, OutlineNode[]>();
   private readonly cardTypes: CardType[] = [
     { id: "builtin-character", name: "人物", icon: "人", color: "#9c4f32", fieldSchema: [{ key: "aliases", label: "別名與稱謂", type: "long_text" }, { key: "role", label: "故事定位", type: "short_text" }, { key: "motivation", label: "目標與動機", type: "long_text" }, { key: "notes", label: "作者備註", type: "long_text" }], isBuiltin: true },
     { id: "builtin-scene", name: "場景", icon: "景", color: "#526d82", fieldSchema: [], isBuiltin: true },
@@ -87,6 +93,7 @@ export class MemoryLibraryGateway implements LibraryGateway {
     this.cards.set(workId, []);
     this.relationships.set(workId, []);
     this.graphs.set(workId, []);
+    this.outlineNodes.set(workId, []);
     return structuredClone(work);
   }
 
@@ -206,6 +213,14 @@ export class MemoryLibraryGateway implements LibraryGateway {
     const index = collection.findIndex((node) => node.cardId === cardId);
     if (index < 0) throw new Error("找不到畫布節點");
     collection.splice(index, 1);
+  }
+  async listOutlineNodes(workId: string) { return structuredClone(this.outlineNodes.get(workId) ?? []); }
+  async saveOutlineNode(input: SaveOutlineNodeInput) {
+    if (!input.title.trim() || !this.works.some((work) => work.id === input.workId)) throw new Error("大綱節點無效");
+    const collection = this.outlineNodes.get(input.workId)!; const existing = collection.find((node) => node.id === input.id); const now = new Date().toISOString();
+    if (input.parentId && !collection.some((node) => node.id === input.parentId)) throw new Error("找不到父節點");
+    const node: OutlineNode = { id: existing?.id ?? crypto.randomUUID(), workId: input.workId, parentId: input.parentId, nodeType: input.nodeType, title: input.title.trim(), summary: input.summary?.trim() ?? "", purpose: input.purpose?.trim() ?? "", conflict: input.conflict?.trim() ?? "", outcome: input.outcome?.trim() ?? "", status: input.status, notes: input.notes?.trim() ?? "", boundEntityKind: existing?.boundEntityKind, boundEntityId: existing?.boundEntityId, sortOrder: existing?.sortOrder ?? collection.filter((item) => item.parentId === input.parentId).length, createdAt: existing?.createdAt ?? now, updatedAt: now };
+    if (existing) collection.splice(collection.indexOf(existing),1,node); else collection.push(node); return structuredClone(node);
   }
 }
 

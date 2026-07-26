@@ -69,4 +69,12 @@ describe("WorkspaceApp", () => {
     await screen.findByRole("combobox", { name: "目前關係圖" });
     expect(screen.getByRole("option", { name: "人物關係" })).toHaveProperty("selected", true);
   });
+
+  it("keeps an outline idea without requiring a chapter binding", async () => {
+    const user = userEvent.setup(); render(<WorkspaceApp gateway={new MemoryLibraryGateway()} />);
+    await screen.findByText("開始第一部作品"); await user.click(screen.getByText("建立作品", { selector: "button.button--primary" })); await screen.findByRole("heading", { name: "第一章" });
+    await user.click(screen.getByRole("button", { name: "大綱" })); await user.click(await screen.findByRole("button", { name: "建立第一個規劃節點" }));
+    await user.type(screen.getByLabelText(/標題/), "主角發現密室"); await user.type(screen.getByLabelText("目的"), "揭露第一條線索"); await user.click(screen.getByRole("button", { name: "建立節點" }));
+    expect(await screen.findByText("主角發現密室")).toBeVisible(); expect(screen.getByText(/尚未綁定/)).toBeVisible();
+  });
 });

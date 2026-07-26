@@ -2,15 +2,18 @@ mod cards;
 mod domain;
 mod graphs;
 mod library;
+mod outline;
 
 use cards::CardRepository;
 use domain::{
-    Card, CardRelationship, CardType, ChapterDocument, DocumentVersionSummary, RecoveryDraft,
-    RelationshipGraph, RelationshipGraphNode, SaveCardInput, SaveCardRelationshipInput,
-    SaveRelationshipGraphInput, SaveRelationshipGraphNodeInput, WorkSummary,
+    Card, CardRelationship, CardType, ChapterDocument, DocumentVersionSummary, OutlineNode,
+    RecoveryDraft, RelationshipGraph, RelationshipGraphNode, SaveCardInput,
+    SaveCardRelationshipInput, SaveOutlineNodeInput, SaveRelationshipGraphInput,
+    SaveRelationshipGraphNodeInput, WorkSummary,
 };
 use graphs::GraphRepository;
 use library::LibraryRepository;
+use outline::OutlineRepository;
 use tauri::Manager;
 
 #[tauri::command]
@@ -236,6 +239,26 @@ fn remove_relationship_graph_node(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn list_outline_nodes(
+    work_id: String,
+    repository: tauri::State<'_, OutlineRepository>,
+) -> Result<Vec<OutlineNode>, String> {
+    repository
+        .list_nodes(&work_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn save_outline_node(
+    input: SaveOutlineNodeInput,
+    repository: tauri::State<'_, OutlineRepository>,
+) -> Result<OutlineNode, String> {
+    repository
+        .save_node(input)
+        .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -248,9 +271,12 @@ pub fn run() {
                 .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
             let graph_repository = GraphRepository::open(&data_dir.join("workspace.sqlite3"))
                 .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
+            let outline_repository = OutlineRepository::open(&data_dir.join("workspace.sqlite3"))
+                .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
             app.manage(repository);
             app.manage(card_repository);
             app.manage(graph_repository);
+            app.manage(outline_repository);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -275,7 +301,9 @@ pub fn run() {
             save_relationship_graph,
             list_relationship_graph_nodes,
             save_relationship_graph_node,
-            remove_relationship_graph_node
+            remove_relationship_graph_node,
+            list_outline_nodes,
+            save_outline_node
         ])
         .run(tauri::generate_context!())
         .expect("GWriter failed to start");

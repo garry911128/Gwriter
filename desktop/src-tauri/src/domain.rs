@@ -174,6 +174,48 @@ pub struct SaveRelationshipGraphNodeInput {
     pub position_y: f64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutlineNode {
+    pub id: String,
+    pub work_id: String,
+    pub parent_id: Option<String>,
+    pub node_type: String,
+    pub title: String,
+    pub summary: String,
+    pub purpose: String,
+    pub conflict: String,
+    pub outcome: String,
+    pub status: String,
+    pub notes: String,
+    pub bound_entity_kind: Option<String>,
+    pub bound_entity_id: Option<String>,
+    pub sort_order: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveOutlineNodeInput {
+    pub id: Option<String>,
+    pub work_id: String,
+    pub parent_id: Option<String>,
+    pub node_type: String,
+    pub title: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub purpose: String,
+    #[serde(default)]
+    pub conflict: String,
+    #[serde(default)]
+    pub outcome: String,
+    pub status: String,
+    #[serde(default)]
+    pub notes: String,
+}
+
 fn empty_object() -> serde_json::Value {
     serde_json::json!({})
 }
