@@ -1,7 +1,12 @@
+mod cards;
 mod domain;
 mod library;
 
-use domain::{ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary};
+use cards::CardRepository;
+use domain::{
+    Card, CardType, ChapterDocument, DocumentVersionSummary, RecoveryDraft, SaveCardInput,
+    WorkSummary,
+};
 use library::LibraryRepository;
 use tauri::Manager;
 
@@ -103,6 +108,47 @@ fn restore_version(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn list_card_types(
+    work_id: String,
+    repository: tauri::State<'_, CardRepository>,
+) -> Result<Vec<CardType>, String> {
+    repository
+        .list_types(&work_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_cards(
+    work_id: String,
+    repository: tauri::State<'_, CardRepository>,
+) -> Result<Vec<Card>, String> {
+    repository
+        .list_cards(&work_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn save_card(
+    input: SaveCardInput,
+    repository: tauri::State<'_, CardRepository>,
+) -> Result<Card, String> {
+    repository
+        .save_card(input)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn delete_card(
+    work_id: String,
+    card_id: String,
+    repository: tauri::State<'_, CardRepository>,
+) -> Result<(), String> {
+    repository
+        .delete_card(&work_id, &card_id)
+        .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -111,7 +157,10 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir)?;
             let repository = LibraryRepository::open(&data_dir.join("workspace.sqlite3"))
                 .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
+            let card_repository = CardRepository::open(&data_dir.join("workspace.sqlite3"))
+                .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
             app.manage(repository);
+            app.manage(card_repository);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -124,7 +173,11 @@ pub fn run() {
             clear_recovery,
             create_version,
             list_versions,
-            restore_version
+            restore_version,
+            list_card_types,
+            list_cards,
+            save_card,
+            delete_card
         ])
         .run(tauri::generate_context!())
         .expect("GWriter failed to start");

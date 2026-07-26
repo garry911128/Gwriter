@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary } from "../../entities/library";
+import type { Card, CardType, SaveCardInput } from "../../entities/cards";
 
 export interface LibraryGateway {
   listWorks(): Promise<WorkSummary[]>;
@@ -12,6 +13,10 @@ export interface LibraryGateway {
   createVersion(chapterId: string, label?: string): Promise<DocumentVersionSummary>;
   listVersions(chapterId: string): Promise<DocumentVersionSummary[]>;
   restoreVersion(versionId: string): Promise<ChapterDocument>;
+  listCardTypes(workId: string): Promise<CardType[]>;
+  listCards(workId: string): Promise<Card[]>;
+  saveCard(input: SaveCardInput): Promise<Card>;
+  deleteCard(workId: string, cardId: string): Promise<void>;
 }
 
 export class TauriLibraryGateway implements LibraryGateway {
@@ -25,6 +30,10 @@ export class TauriLibraryGateway implements LibraryGateway {
   createVersion(chapterId: string, label?: string) { return invoke<DocumentVersionSummary>("create_version", { chapterId, label: label?.trim() || null }); }
   listVersions(chapterId: string) { return invoke<DocumentVersionSummary[]>("list_versions", { chapterId }); }
   restoreVersion(versionId: string) { return invoke<ChapterDocument>("restore_version", { versionId }); }
+  listCardTypes(workId: string) { return invoke<CardType[]>("list_card_types", { workId }); }
+  listCards(workId: string) { return invoke<Card[]>("list_cards", { workId }); }
+  saveCard(input: SaveCardInput) { return invoke<Card>("save_card", { input }); }
+  deleteCard(workId: string, cardId: string) { return invoke<void>("delete_card", { workId, cardId }); }
 }
 
 export class MemoryLibraryGateway implements LibraryGateway {
@@ -33,6 +42,12 @@ export class MemoryLibraryGateway implements LibraryGateway {
   private recovery = new Map<string, RecoveryDraft>();
   private versions = new Map<string, DocumentVersionSummary[]>();
   private versionTexts = new Map<string, string>();
+  private cards = new Map<string, Card[]>();
+  private readonly cardTypes: CardType[] = [
+    { id: "builtin-character", name: "人物", icon: "人", color: "#9c4f32", fieldSchema: [], isBuiltin: true },
+    { id: "builtin-scene", name: "場景", icon: "景", color: "#526d82", fieldSchema: [], isBuiltin: true },
+    { id: "builtin-location", name: "地點", icon: "地", color: "#54705b", fieldSchema: [], isBuiltin: true },
+  ];
 
   async listWorks() { return structuredClone(this.works); }
 
@@ -50,6 +65,7 @@ export class MemoryLibraryGateway implements LibraryGateway {
     this.works.unshift(work);
     this.documents.set(chapterId, { chapterId, schemaVersion: 1, text: "", savedAt: now });
     this.versions.set(chapterId, []);
+    this.cards.set(workId, []);
     return structuredClone(work);
   }
 
@@ -97,6 +113,26 @@ export class MemoryLibraryGateway implements LibraryGateway {
     this.versions.get(target.chapterId)?.unshift(before);
     this.versionTexts.set(before.id, current.text);
     return this.saveChapter(target.chapterId, targetText);
+  }
+
+  async listCardTypes(_workId: string) { return structuredClone(this.cardTypes); }
+  async listCards(workId: string) { return structuredClone(this.cards.get(workId) ?? []); }
+  async saveCard(input: SaveCardInput) {
+    if (!this.works.some((work) => work.id === input.workId)) throw new Error("找不到作品");
+    const type = this.cardTypes.find((item) => item.id === input.typeId);
+    if (!type || !input.name.trim()) throw new Error("卡牌資料無效");
+    const now = new Date().toISOString();
+    const existing = this.cards.get(input.workId)?.find((card) => card.id === input.id);
+    const card: Card = { id: existing?.id ?? crypto.randomUUID(), workId: input.workId, typeId: input.typeId, typeName: type.name, name: input.name.trim(), canonStatus: input.canonStatus, summary: input.summary ?? "", details: input.details ?? {}, tags: [...new Set(input.tags ?? [])], createdAt: existing?.createdAt ?? now, updatedAt: now };
+    const collection = this.cards.get(input.workId)!;
+    if (existing) collection.splice(collection.indexOf(existing), 1, card); else collection.push(card);
+    return structuredClone(card);
+  }
+  async deleteCard(workId: string, cardId: string) {
+    const collection = this.cards.get(workId) ?? [];
+    const index = collection.findIndex((card) => card.id === cardId);
+    if (index < 0) throw new Error("找不到卡牌");
+    collection.splice(index, 1);
   }
 }
 
