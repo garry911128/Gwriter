@@ -3,7 +3,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary } from "../../entities/library";
 import type { Card, CardRelationship, CardType, RelationshipGraph, RelationshipGraphNode, SaveCardInput, SaveCardRelationshipInput, SaveRelationshipGraphInput, SaveRelationshipGraphNodeInput } from "../../entities/cards";
 import type { OutlineNode, SaveOutlineNodeInput } from "../../entities/outline";
-import type { LocalBackupInfo, PortableBackupInfo, WorkspaceStorageInfo } from "../../entities/settings";
+import type { LocalBackupInfo, PortableBackupInfo, RestorePreparation, WorkspaceStorageInfo } from "../../entities/settings";
 
 export interface LibraryGateway {
   listWorks(): Promise<WorkSummary[]>;
@@ -36,6 +36,8 @@ export interface LibraryGateway {
   listLocalBackups(): Promise<LocalBackupInfo[]>;
   openWorkspaceDataDirectory(): Promise<void>;
   exportPortableBackup(destination: string): Promise<PortableBackupInfo>;
+  preparePortableRestore(source: string): Promise<RestorePreparation>;
+  restartApplication(): Promise<void>;
 }
 
 export class TauriLibraryGateway implements LibraryGateway {
@@ -69,6 +71,8 @@ export class TauriLibraryGateway implements LibraryGateway {
   listLocalBackups() { return invoke<LocalBackupInfo[]>("list_local_backups"); }
   async openWorkspaceDataDirectory() { const info = await this.getWorkspaceStorageInfo(); await openPath(info.dataDirectory); }
   exportPortableBackup(destination: string) { return invoke<PortableBackupInfo>("export_portable_backup", { destination }); }
+  preparePortableRestore(source: string) { return invoke<RestorePreparation>("prepare_portable_restore", { source }); }
+  restartApplication() { return invoke<void>("restart_application"); }
 }
 
 export class MemoryLibraryGateway implements LibraryGateway {
@@ -251,6 +255,8 @@ export class MemoryLibraryGateway implements LibraryGateway {
   async listLocalBackups() { return structuredClone(this.localBackups); }
   async openWorkspaceDataDirectory() {}
   async exportPortableBackup(destination: string) { return { path:destination,sizeBytes:8192,createdAt:new Date().toISOString(),formatVersion:1,databaseSha256:"a".repeat(64) }; }
+  async preparePortableRestore(source: string) { return { sourcePath:source,backupCreatedAt:new Date().toISOString(),formatVersion:1,schemaVersion:6 }; }
+  async restartApplication() {}
 }
 
 export function createLibraryGateway(): LibraryGateway {

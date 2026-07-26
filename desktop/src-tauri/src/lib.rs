@@ -10,8 +10,8 @@ use cards::CardRepository;
 use domain::{
     Card, CardRelationship, CardType, ChapterDocument, DocumentVersionSummary, LocalBackupInfo,
     OutlineNode, PortableBackupInfo, RecoveryDraft, RelationshipGraph, RelationshipGraphNode,
-    SaveCardInput, SaveCardRelationshipInput, SaveOutlineNodeInput, SaveRelationshipGraphInput,
-    SaveRelationshipGraphNodeInput, WorkSummary, WorkspaceStorageInfo,
+    RestorePreparation, SaveCardInput, SaveCardRelationshipInput, SaveOutlineNodeInput,
+    SaveRelationshipGraphInput, SaveRelationshipGraphNodeInput, WorkSummary, WorkspaceStorageInfo,
 };
 use graphs::GraphRepository;
 use library::LibraryRepository;
@@ -297,6 +297,19 @@ fn export_portable_backup(
         .export_portable_backup(std::path::Path::new(&destination))
         .map_err(|error| error.to_string())
 }
+#[tauri::command]
+fn prepare_portable_restore(
+    source: String,
+    service: tauri::State<'_, BackupService>,
+) -> Result<RestorePreparation, String> {
+    service
+        .stage_portable_restore(std::path::Path::new(&source))
+        .map_err(|error| error.to_string())
+}
+#[tauri::command]
+fn restart_application(app: tauri::AppHandle) {
+    app.restart()
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -306,6 +319,8 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
+            BackupService::apply_pending_restore(&data_dir)
+                .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
             let repository = LibraryRepository::open(&data_dir.join("workspace.sqlite3"))
                 .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
             let card_repository = CardRepository::open(&data_dir.join("workspace.sqlite3"))
@@ -352,7 +367,9 @@ pub fn run() {
             get_workspace_storage_info,
             create_local_backup,
             list_local_backups,
-            export_portable_backup
+            export_portable_backup,
+            prepare_portable_restore,
+            restart_application
         ])
         .run(tauri::generate_context!())
         .expect("GWriter failed to start");

@@ -1,7 +1,9 @@
-use crate::domain::{LocalBackupInfo, PortableBackupInfo, WorkspaceStorageInfo};
+use crate::domain::{
+    LocalBackupInfo, PortableBackupInfo, RestorePreparation, WorkspaceStorageInfo,
+};
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use rusqlite::{Connection, DatabaseName};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -32,15 +34,15 @@ pub struct BackupService {
     backup_directory: PathBuf,
 }
 
-#[derive(Serialize)]
-struct PortableManifest<'a> {
-    format: &'a str,
+#[derive(Serialize, Deserialize)]
+struct PortableManifest {
+    format: String,
     format_version: i64,
-    created_at: &'a str,
-    app_version: &'a str,
+    created_at: String,
+    app_version: String,
     schema_version: i64,
-    database_path: &'a str,
-    database_sha256: &'a str,
+    database_path: String,
+    database_sha256: String,
     assets: Vec<String>,
 }
 impl BackupService {
@@ -127,13 +129,13 @@ impl BackupService {
             .collect::<String>();
         let created_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
         let manifest = PortableManifest {
-            format: "gwriter-workspace-backup",
+            format: "gwriter-workspace-backup".into(),
             format_version: BACKUP_FORMAT_VERSION,
-            created_at: &created_at,
-            app_version: env!("CARGO_PKG_VERSION"),
+            created_at: created_at.clone(),
+            app_version: env!("CARGO_PKG_VERSION").into(),
             schema_version,
-            database_path: "workspace/workspace.sqlite3",
-            database_sha256: &database_sha256,
+            database_path: "workspace/workspace.sqlite3".into(),
+            database_sha256: database_sha256.clone(),
             assets: vec![],
         };
         let partial = parent.join(format!(".gwriter-export-{token}.partial"));
@@ -165,6 +167,102 @@ impl BackupService {
             format_version: BACKUP_FORMAT_VERSION,
             database_sha256,
         })
+    }
+    pub fn stage_portable_restore(&self, source: &Path) -> Result<RestorePreparation, BackupError> {
+        let mut archive = zip::ZipArchive::new(fs::File::open(source)?)?;
+        let mut manifest_text = String::new();
+        {
+            let mut entry = archive.by_name("manifest.json")?;
+            if entry.size() > 1_048_576 {
+                return Err(BackupError::Integrity);
+            }
+            std::io::Read::read_to_string(&mut entry, &mut manifest_text)?;
+        }
+        let manifest: PortableManifest = serde_json::from_str(&manifest_text)?;
+        if manifest.format != "gwriter-workspace-backup"
+            || manifest.format_version != BACKUP_FORMAT_VERSION
+            || manifest.database_path != "workspace/workspace.sqlite3"
+            || !(1..=6).contains(&manifest.schema_version)
+        {
+            return Err(BackupError::Integrity);
+        }
+        let candidate = self.data_directory.join(format!(
+            "restore-candidate-{}.sqlite3",
+            uuid::Uuid::new_v4()
+        ));
+        let result = (|| -> Result<(), BackupError> {
+            let mut entry = archive.by_name(&manifest.database_path)?;
+            if entry.size() > 64 * 1024 * 1024 * 1024 { return Err(BackupError::Integrity); }
+            let mut output = fs::File::create(&candidate)?;
+            let mut hasher = Sha256::new();
+            let mut buffer = [0_u8; 64 * 1024];
+            loop {
+                let count = std::io::Read::read(&mut entry, &mut buffer)?;
+                if count == 0 {
+                    break;
+                }
+                std::io::Write::write_all(&mut output, &buffer[..count])?;
+                hasher.update(&buffer[..count]);
+            }
+            output.sync_all()?;
+            let digest = hasher
+                .finalize()
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            if digest != manifest.database_sha256 {
+                return Err(BackupError::Integrity);
+            }
+            let database = Connection::open(&candidate)?;
+            let check: String = database.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+            let schema: i64 =
+                database.pragma_query_value(None, "user_version", |row| row.get(0))?;
+            drop(database);
+            if check != "ok" || schema != manifest.schema_version {
+                return Err(BackupError::Integrity);
+            }
+            let pending = self.data_directory.join("restore-pending.sqlite3");
+            if pending.exists() {
+                fs::remove_file(&pending)?;
+            }
+            fs::rename(&candidate, pending)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&candidate);
+        }
+        result?;
+        Ok(RestorePreparation {
+            source_path: source.display().to_string(),
+            backup_created_at: manifest.created_at,
+            format_version: manifest.format_version,
+            schema_version: manifest.schema_version,
+        })
+    }
+    pub fn apply_pending_restore(data_directory: &Path) -> Result<bool, BackupError> {
+        let pending = data_directory.join("restore-pending.sqlite3");
+        if !pending.exists() {
+            return Ok(false);
+        }
+        let service = Self::new(data_directory.to_path_buf());
+        if service.database_path.exists() {
+            service.create_backup()?;
+        }
+        let previous = data_directory.join("workspace-before-restore.sqlite3");
+        if previous.exists() {
+            fs::remove_file(&previous)?;
+        }
+        if service.database_path.exists() {
+            fs::rename(&service.database_path, &previous)?;
+        }
+        if let Err(error) = fs::rename(&pending, &service.database_path) {
+            if previous.exists() {
+                let _ = fs::rename(&previous, &service.database_path);
+            }
+            return Err(error.into());
+        }
+        let _ = fs::remove_file(previous);
+        Ok(true)
     }
     pub fn list_backups(&self) -> Result<Vec<LocalBackupInfo>, BackupError> {
         if !self.backup_directory.exists() {
@@ -267,5 +365,42 @@ mod tests {
         assert_eq!(manifest["schema_version"], 6);
         assert_eq!(manifest["database_sha256"], result.database_sha256);
         assert!(archive.by_name("workspace/workspace.sqlite3").is_ok());
+    }
+
+    #[test]
+    fn restore_is_staged_verified_and_applied_only_at_restart_boundary() {
+        let directory = tempfile::tempdir().unwrap();
+        let db = directory.path().join("workspace.sqlite3");
+        let connection = Connection::open(&db).unwrap();
+        connection.execute_batch("PRAGMA user_version=6; CREATE TABLE sample(value TEXT); INSERT INTO sample VALUES ('備份內容');").unwrap();
+        drop(connection);
+        let service = BackupService::new(directory.path().to_path_buf());
+        let package = directory.path().join("restore.gwriter-backup");
+        service.export_portable_backup(&package).unwrap();
+        let current = Connection::open(&db).unwrap();
+        current
+            .execute("UPDATE sample SET value='目前內容'", [])
+            .unwrap();
+        drop(current);
+        let prepared = service.stage_portable_restore(&package).unwrap();
+        assert_eq!(prepared.schema_version, 6);
+        assert!(
+            Connection::open(&db)
+                .unwrap()
+                .query_row("SELECT value FROM sample", [], |row| row
+                    .get::<_, String>(0))
+                .unwrap()
+                == "目前內容"
+        );
+        assert!(BackupService::apply_pending_restore(directory.path()).unwrap());
+        let restored = Connection::open(&db).unwrap();
+        assert_eq!(
+            restored
+                .query_row("SELECT value FROM sample", [], |row| row
+                    .get::<_, String>(0))
+                .unwrap(),
+            "備份內容"
+        );
+        assert!(!service.list_backups().unwrap().is_empty());
     }
 }
