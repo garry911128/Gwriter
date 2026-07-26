@@ -63,7 +63,7 @@ export class MemoryLibraryGateway implements LibraryGateway {
   private graphs = new Map<string, RelationshipGraph[]>();
   private graphNodes = new Map<string, RelationshipGraphNode[]>();
   private readonly cardTypes: CardType[] = [
-    { id: "builtin-character", name: "人物", icon: "人", color: "#9c4f32", fieldSchema: [], isBuiltin: true },
+    { id: "builtin-character", name: "人物", icon: "人", color: "#9c4f32", fieldSchema: [{ key: "aliases", label: "別名與稱謂", type: "long_text" }, { key: "role", label: "故事定位", type: "short_text" }, { key: "motivation", label: "目標與動機", type: "long_text" }, { key: "notes", label: "作者備註", type: "long_text" }], isBuiltin: true },
     { id: "builtin-scene", name: "場景", icon: "景", color: "#526d82", fieldSchema: [], isBuiltin: true },
     { id: "builtin-location", name: "地點", icon: "地", color: "#54705b", fieldSchema: [], isBuiltin: true },
   ];

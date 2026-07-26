@@ -28,6 +28,11 @@ describe("WorkspaceApp", () => {
     await user.click(screen.getByRole("button", { name: /^建立$/ }));
     expect(await screen.findByRole("heading", { name: "林清越" })).toBeVisible();
     expect(screen.getByText("確定設定")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "編輯設定" }));
+    await user.type(screen.getByLabelText("故事定位"), "主角");
+    await user.type(screen.getByLabelText("標籤"), "偵探、第一視角");
+    await user.click(screen.getByRole("button", { name: "儲存修改" }));
+    expect(await screen.findByText(/偵探、第一視角/)).toBeVisible();
   });
 
   it("lets the author explicitly connect two cards", async () => {

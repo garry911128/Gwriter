@@ -374,6 +374,39 @@ mod tests {
     }
 
     #[test]
+    fn card_details_and_tags_round_trip_when_the_author_edits_them() {
+        let (_directory, library, cards) = repositories();
+        let work = library.create_work(None).unwrap();
+        let created = cards
+            .save_card(SaveCardInput {
+                id: None,
+                work_id: work.id.clone(),
+                type_id: "builtin-character".into(),
+                name: "阿黎".into(),
+                canon_status: "tentative".into(),
+                summary: String::new(),
+                details: serde_json::json!({}),
+                tags: vec![],
+            })
+            .unwrap();
+        let updated = cards
+            .save_card(SaveCardInput {
+                id: Some(created.id.clone()),
+                work_id: work.id,
+                type_id: "builtin-character".into(),
+                name: "阿黎".into(),
+                canon_status: "confirmed".into(),
+                summary: "追查失蹤案".into(),
+                details: serde_json::json!({"role":"主角","motivation":"尋找真相"}),
+                tags: vec!["偵探".into(), "偵探".into(), "第一視角".into()],
+            })
+            .unwrap();
+        assert_eq!(updated.id, created.id);
+        assert_eq!(updated.details["role"], "主角");
+        assert_eq!(updated.tags, vec!["偵探", "第一視角"]);
+    }
+
+    #[test]
     fn card_type_must_be_available_to_the_same_work() {
         let (_directory, library, cards) = repositories();
         let work = library.create_work(None).unwrap();
