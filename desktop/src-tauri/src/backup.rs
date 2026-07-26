@@ -4,7 +4,6 @@ use rusqlite::{Connection, DatabaseName};
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
 };
 use thiserror::Error;
 
@@ -124,25 +123,6 @@ impl BackupService {
             format_version: BACKUP_FORMAT_VERSION,
         })
     }
-    pub fn open_data_directory(&self) -> Result<(), BackupError> {
-        open_directory(&self.data_directory)
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn open_directory(path: &Path) -> Result<(), BackupError> {
-    Command::new("explorer.exe").arg(path).spawn()?;
-    Ok(())
-}
-#[cfg(target_os = "macos")]
-fn open_directory(path: &Path) -> Result<(), BackupError> {
-    Command::new("open").arg(path).spawn()?;
-    Ok(())
-}
-#[cfg(all(unix, not(target_os = "macos")))]
-fn open_directory(path: &Path) -> Result<(), BackupError> {
-    Command::new("xdg-open").arg(path).spawn()?;
-    Ok(())
 }
 
 #[cfg(test)]

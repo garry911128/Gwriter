@@ -288,16 +288,12 @@ fn list_local_backups(
 ) -> Result<Vec<LocalBackupInfo>, String> {
     service.list_backups().map_err(|error| error.to_string())
 }
-#[tauri::command]
-fn open_workspace_data_directory(service: tauri::State<'_, BackupService>) -> Result<(), String> {
-    service
-        .open_data_directory()
-        .map_err(|error| error.to_string())
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
@@ -346,8 +342,7 @@ pub fn run() {
             convert_outline_node_to_chapter,
             get_workspace_storage_info,
             create_local_backup,
-            list_local_backups,
-            open_workspace_data_directory
+            list_local_backups
         ])
         .run(tauri::generate_context!())
         .expect("GWriter failed to start");

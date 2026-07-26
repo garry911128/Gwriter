@@ -12,21 +12,23 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-opener": "^2.5.4",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "@tauri-apps/api": "^2"
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
+    "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "jsdom": "^26.1.0",
     "typescript": "~5.8.3",
     "vite": "^6.1.0",
-    "vitest": "^3.2.4",
-    "@tauri-apps/cli": "^2"
+    "vitest": "^3.2.4"
   }
 }

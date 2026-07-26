@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { openPath } from "@tauri-apps/plugin-opener";
 import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary } from "../../entities/library";
 import type { Card, CardRelationship, CardType, RelationshipGraph, RelationshipGraphNode, SaveCardInput, SaveCardRelationshipInput, SaveRelationshipGraphInput, SaveRelationshipGraphNodeInput } from "../../entities/cards";
 import type { OutlineNode, SaveOutlineNodeInput } from "../../entities/outline";
@@ -65,7 +66,7 @@ export class TauriLibraryGateway implements LibraryGateway {
   getWorkspaceStorageInfo() { return invoke<WorkspaceStorageInfo>("get_workspace_storage_info"); }
   createLocalBackup() { return invoke<LocalBackupInfo>("create_local_backup"); }
   listLocalBackups() { return invoke<LocalBackupInfo[]>("list_local_backups"); }
-  openWorkspaceDataDirectory() { return invoke<void>("open_workspace_data_directory"); }
+  async openWorkspaceDataDirectory() { const info = await this.getWorkspaceStorageInfo(); await openPath(info.dataDirectory); }
 }
 
 export class MemoryLibraryGateway implements LibraryGateway {
