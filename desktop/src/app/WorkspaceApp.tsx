@@ -3,6 +3,7 @@ import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummar
 import { statusLabels } from "../entities/library";
 import type { LibraryGateway } from "../shared/api/libraryGateway";
 import { CardWorkspace } from "./CardWorkspace";
+import { GraphWorkspace } from "./GraphWorkspace";
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "failed";
 const saveLabels: Record<SaveState, string> = { idle: "尚未編輯", dirty: "尚未儲存", saving: "儲存中…", saved: "已儲存", failed: "儲存失敗" };
@@ -18,7 +19,7 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
   const [recoveryDraft, setRecoveryDraft] = useState<RecoveryDraft>();
   const [versions, setVersions] = useState<DocumentVersionSummary[]>([]);
   const [versionsOpen, setVersionsOpen] = useState(false);
-  const [activeTool, setActiveTool] = useState<"works" | "cards">("works");
+  const [activeTool, setActiveTool] = useState<"works" | "cards" | "graph">("works");
   const saveSequence = useRef(0);
   const activeWork = useMemo(() => works.find((work) => work.id === activeWorkId), [activeWorkId, works]);
   const activeChapter = activeWork?.chapters.find((chapter) => chapter.id === activeChapterId);
@@ -112,7 +113,7 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
     {error && <div className="alert" role="alert">{error}<button onClick={() => setError(undefined)} aria-label="關閉錯誤">×</button></div>}
     <div className="workspace">
       <aside className="rail" aria-label="主要功能">
-        {[["文", "作品", "works"], ["卡", "創作卡牌", "cards"], ["綱", "大綱", "outline"], ["線", "關係圖", "graph"], ["搜", "搜尋", "search"], ["設", "設定", "settings"]].map(([icon, label, tool]) => <button key={label} className={activeTool === tool ? "rail-item rail-item--active" : "rail-item"} aria-label={label} title={label} onClick={() => (tool === "works" || tool === "cards") && setActiveTool(tool)}><span aria-hidden="true">{icon}</span></button>)}
+        {[["文", "作品", "works"], ["卡", "創作卡牌", "cards"], ["綱", "大綱", "outline"], ["線", "關係圖", "graph"], ["搜", "搜尋", "search"], ["設", "設定", "settings"]].map(([icon, label, tool]) => <button key={label} className={activeTool === tool ? "rail-item rail-item--active" : "rail-item"} aria-label={label} title={label} onClick={() => (tool === "works" || tool === "cards" || tool === "graph") && setActiveTool(tool)}><span aria-hidden="true">{icon}</span></button>)}
       </aside>
       <aside className="navigator" aria-label="作品導覽">
         <div className="panel-heading"><div><span className="eyebrow">工作區</span><h1>我的作品</h1></div><button className="icon-button" onClick={createWork} aria-label="建立作品">＋</button></div>
@@ -122,7 +123,7 @@ export function WorkspaceApp({ gateway }: { gateway: LibraryGateway }) {
         </section>)}</div>
         {!works.length && <div className="empty-state"><div className="empty-glyph" aria-hidden="true">✦</div><h2>開始第一部作品</h2><p>不必先設定人物或場景，建立後就能直接寫作。</p><button className="button button--primary" onClick={createWork}>建立作品</button></div>}
       </aside>
-      {activeTool === "cards" ? <CardWorkspace workId={activeWorkId} gateway={gateway} onError={setError} /> : <main className="editor-pane">
+      {activeTool === "cards" ? <CardWorkspace workId={activeWorkId} gateway={gateway} onError={setError} /> : activeTool === "graph" ? <GraphWorkspace workId={activeWorkId} gateway={gateway} onError={setError} /> : <main className="editor-pane">
         {activeChapter ? <>
           <div className="document-header"><div><span className="breadcrumbs">{activeWork?.title} ／ 正文</span><h2>{activeChapter.title}</h2></div><div className="document-actions"><button className="button button--quiet" onClick={openVersions}>版本</button><button className="button button--accent">AI 建議</button></div></div>
           <div className="editor-wrap">

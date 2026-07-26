@@ -131,6 +131,49 @@ pub struct SaveCardRelationshipInput {
     pub is_secret: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelationshipGraph {
+    pub id: String,
+    pub work_id: String,
+    pub name: String,
+    pub description: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveRelationshipGraphInput {
+    pub id: Option<String>,
+    pub work_id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelationshipGraphNode {
+    pub graph_id: String,
+    pub card_id: String,
+    pub card_name: String,
+    pub type_name: String,
+    pub color: String,
+    pub position_x: f64,
+    pub position_y: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveRelationshipGraphNodeInput {
+    pub work_id: String,
+    pub graph_id: String,
+    pub card_id: String,
+    pub position_x: f64,
+    pub position_y: f64,
+}
+
 fn empty_object() -> serde_json::Value {
     serde_json::json!({})
 }

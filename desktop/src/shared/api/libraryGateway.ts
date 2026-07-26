@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ChapterDocument, DocumentVersionSummary, RecoveryDraft, WorkSummary } from "../../entities/library";
-import type { Card, CardRelationship, CardType, SaveCardInput, SaveCardRelationshipInput } from "../../entities/cards";
+import type { Card, CardRelationship, CardType, RelationshipGraph, RelationshipGraphNode, SaveCardInput, SaveCardRelationshipInput, SaveRelationshipGraphInput, SaveRelationshipGraphNodeInput } from "../../entities/cards";
 
 export interface LibraryGateway {
   listWorks(): Promise<WorkSummary[]>;
@@ -20,6 +20,11 @@ export interface LibraryGateway {
   listCardRelationships(workId: string): Promise<CardRelationship[]>;
   saveCardRelationship(input: SaveCardRelationshipInput): Promise<CardRelationship>;
   deleteCardRelationship(workId: string, relationshipId: string): Promise<void>;
+  listRelationshipGraphs(workId: string): Promise<RelationshipGraph[]>;
+  saveRelationshipGraph(input: SaveRelationshipGraphInput): Promise<RelationshipGraph>;
+  listRelationshipGraphNodes(workId: string, graphId: string): Promise<RelationshipGraphNode[]>;
+  saveRelationshipGraphNode(input: SaveRelationshipGraphNodeInput): Promise<RelationshipGraphNode>;
+  removeRelationshipGraphNode(workId: string, graphId: string, cardId: string): Promise<void>;
 }
 
 export class TauriLibraryGateway implements LibraryGateway {
@@ -40,6 +45,11 @@ export class TauriLibraryGateway implements LibraryGateway {
   listCardRelationships(workId: string) { return invoke<CardRelationship[]>("list_card_relationships", { workId }); }
   saveCardRelationship(input: SaveCardRelationshipInput) { return invoke<CardRelationship>("save_card_relationship", { input }); }
   deleteCardRelationship(workId: string, relationshipId: string) { return invoke<void>("delete_card_relationship", { workId, relationshipId }); }
+  listRelationshipGraphs(workId: string) { return invoke<RelationshipGraph[]>("list_relationship_graphs", { workId }); }
+  saveRelationshipGraph(input: SaveRelationshipGraphInput) { return invoke<RelationshipGraph>("save_relationship_graph", { input }); }
+  listRelationshipGraphNodes(workId: string, graphId: string) { return invoke<RelationshipGraphNode[]>("list_relationship_graph_nodes", { workId, graphId }); }
+  saveRelationshipGraphNode(input: SaveRelationshipGraphNodeInput) { return invoke<RelationshipGraphNode>("save_relationship_graph_node", { input }); }
+  removeRelationshipGraphNode(workId: string, graphId: string, cardId: string) { return invoke<void>("remove_relationship_graph_node", { workId, graphId, cardId }); }
 }
 
 export class MemoryLibraryGateway implements LibraryGateway {
@@ -50,6 +60,8 @@ export class MemoryLibraryGateway implements LibraryGateway {
   private versionTexts = new Map<string, string>();
   private cards = new Map<string, Card[]>();
   private relationships = new Map<string, CardRelationship[]>();
+  private graphs = new Map<string, RelationshipGraph[]>();
+  private graphNodes = new Map<string, RelationshipGraphNode[]>();
   private readonly cardTypes: CardType[] = [
     { id: "builtin-character", name: "人物", icon: "人", color: "#9c4f32", fieldSchema: [], isBuiltin: true },
     { id: "builtin-scene", name: "場景", icon: "景", color: "#526d82", fieldSchema: [], isBuiltin: true },
@@ -74,6 +86,7 @@ export class MemoryLibraryGateway implements LibraryGateway {
     this.versions.set(chapterId, []);
     this.cards.set(workId, []);
     this.relationships.set(workId, []);
+    this.graphs.set(workId, []);
     return structuredClone(work);
   }
 
@@ -159,6 +172,39 @@ export class MemoryLibraryGateway implements LibraryGateway {
     const collection = this.relationships.get(workId) ?? [];
     const index = collection.findIndex((item) => item.id === relationshipId);
     if (index < 0) throw new Error("找不到關係");
+    collection.splice(index, 1);
+  }
+  async listRelationshipGraphs(workId: string) { return structuredClone(this.graphs.get(workId) ?? []); }
+  async saveRelationshipGraph(input: SaveRelationshipGraphInput) {
+    if (!input.name.trim() || !this.works.some((work) => work.id === input.workId)) throw new Error("關係圖資料無效");
+    const collection = this.graphs.get(input.workId)!;
+    const existing = collection.find((graph) => graph.id === input.id);
+    const now = new Date().toISOString();
+    const graph: RelationshipGraph = { id: existing?.id ?? crypto.randomUUID(), workId: input.workId, name: input.name.trim(), description: input.description?.trim() ?? "", createdAt: existing?.createdAt ?? now, updatedAt: now };
+    if (existing) collection.splice(collection.indexOf(existing), 1, graph); else collection.push(graph);
+    this.graphNodes.set(graph.id, this.graphNodes.get(graph.id) ?? []);
+    return structuredClone(graph);
+  }
+  async listRelationshipGraphNodes(workId: string, graphId: string) {
+    if (!this.graphs.get(workId)?.some((graph) => graph.id === graphId)) throw new Error("找不到關係圖");
+    return structuredClone(this.graphNodes.get(graphId) ?? []);
+  }
+  async saveRelationshipGraphNode(input: SaveRelationshipGraphNodeInput) {
+    const graph = this.graphs.get(input.workId)?.find((item) => item.id === input.graphId);
+    const card = this.cards.get(input.workId)?.find((item) => item.id === input.cardId);
+    if (!graph || !card || !Number.isFinite(input.positionX) || !Number.isFinite(input.positionY)) throw new Error("畫布節點無效");
+    const collection = this.graphNodes.get(input.graphId)!;
+    const existing = collection.find((node) => node.cardId === card.id);
+    const type = this.cardTypes.find((item) => item.id === card.typeId)!;
+    const node: RelationshipGraphNode = { graphId: graph.id, cardId: card.id, cardName: card.name, typeName: card.typeName, color: type.color, positionX: input.positionX, positionY: input.positionY };
+    if (existing) collection.splice(collection.indexOf(existing), 1, node); else collection.push(node);
+    return structuredClone(node);
+  }
+  async removeRelationshipGraphNode(workId: string, graphId: string, cardId: string) {
+    if (!this.graphs.get(workId)?.some((graph) => graph.id === graphId)) throw new Error("找不到關係圖");
+    const collection = this.graphNodes.get(graphId) ?? [];
+    const index = collection.findIndex((node) => node.cardId === cardId);
+    if (index < 0) throw new Error("找不到畫布節點");
     collection.splice(index, 1);
   }
 }

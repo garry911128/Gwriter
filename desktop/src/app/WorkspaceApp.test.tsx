@@ -50,4 +50,18 @@ describe("WorkspaceApp", () => {
     expect(await screen.findByText("師徒 · 目前成立")).toBeVisible();
     expect(screen.getByLabelText("directed")).toBeVisible();
   });
+
+  it("creates an optional relationship graph without changing the manuscript", async () => {
+    const user = userEvent.setup();
+    render(<WorkspaceApp gateway={new MemoryLibraryGateway()} />);
+    await screen.findByText("開始第一部作品");
+    await user.click(screen.getByText("建立作品", { selector: "button.button--primary" }));
+    await screen.findByRole("heading", { name: "第一章" });
+    await user.click(screen.getByRole("button", { name: "關係圖" }));
+    await user.click(await screen.findByRole("button", { name: "建立關係圖" }));
+    await user.type(screen.getByLabelText("關係圖名稱"), "人物關係");
+    await user.click(screen.getByRole("button", { name: "建立圖" }));
+    await screen.findByRole("combobox", { name: "目前關係圖" });
+    expect(screen.getByRole("option", { name: "人物關係" })).toHaveProperty("selected", true);
+  });
 });

@@ -1,12 +1,15 @@
 mod cards;
 mod domain;
+mod graphs;
 mod library;
 
 use cards::CardRepository;
 use domain::{
     Card, CardRelationship, CardType, ChapterDocument, DocumentVersionSummary, RecoveryDraft,
-    SaveCardInput, SaveCardRelationshipInput, WorkSummary,
+    RelationshipGraph, RelationshipGraphNode, SaveCardInput, SaveCardRelationshipInput,
+    SaveRelationshipGraphInput, SaveRelationshipGraphNodeInput, WorkSummary,
 };
+use graphs::GraphRepository;
 use library::LibraryRepository;
 use tauri::Manager;
 
@@ -180,6 +183,59 @@ fn delete_card_relationship(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn list_relationship_graphs(
+    work_id: String,
+    repository: tauri::State<'_, GraphRepository>,
+) -> Result<Vec<RelationshipGraph>, String> {
+    repository
+        .list_graphs(&work_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn save_relationship_graph(
+    input: SaveRelationshipGraphInput,
+    repository: tauri::State<'_, GraphRepository>,
+) -> Result<RelationshipGraph, String> {
+    repository
+        .save_graph(input)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_relationship_graph_nodes(
+    work_id: String,
+    graph_id: String,
+    repository: tauri::State<'_, GraphRepository>,
+) -> Result<Vec<RelationshipGraphNode>, String> {
+    repository
+        .list_nodes(&work_id, &graph_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn save_relationship_graph_node(
+    input: SaveRelationshipGraphNodeInput,
+    repository: tauri::State<'_, GraphRepository>,
+) -> Result<RelationshipGraphNode, String> {
+    repository
+        .save_node(input)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn remove_relationship_graph_node(
+    work_id: String,
+    graph_id: String,
+    card_id: String,
+    repository: tauri::State<'_, GraphRepository>,
+) -> Result<(), String> {
+    repository
+        .remove_node(&work_id, &graph_id, &card_id)
+        .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -190,8 +246,11 @@ pub fn run() {
                 .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
             let card_repository = CardRepository::open(&data_dir.join("workspace.sqlite3"))
                 .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
+            let graph_repository = GraphRepository::open(&data_dir.join("workspace.sqlite3"))
+                .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
             app.manage(repository);
             app.manage(card_repository);
+            app.manage(graph_repository);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -211,7 +270,12 @@ pub fn run() {
             delete_card,
             list_card_relationships,
             save_card_relationship,
-            delete_card_relationship
+            delete_card_relationship,
+            list_relationship_graphs,
+            save_relationship_graph,
+            list_relationship_graph_nodes,
+            save_relationship_graph_node,
+            remove_relationship_graph_node
         ])
         .run(tauri::generate_context!())
         .expect("GWriter failed to start");

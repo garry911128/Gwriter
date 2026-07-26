@@ -80,3 +80,8 @@ export interface SaveCardRelationshipInput {
   status: RelationshipStatus;
   isSecret?: boolean;
 }
+
+export interface RelationshipGraph { id: string; workId: string; name: string; description: string; createdAt: string; updatedAt: string; }
+export interface SaveRelationshipGraphInput { id?: string; workId: string; name: string; description?: string; }
+export interface RelationshipGraphNode { graphId: string; cardId: string; cardName: string; typeName: string; color: string; positionX: number; positionY: number; }
+export interface SaveRelationshipGraphNodeInput { workId: string; graphId: string; cardId: string; positionX: number; positionY: number; }
